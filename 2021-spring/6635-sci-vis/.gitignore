@@ -1,1 +1,5 @@
 ParaViewTutorialData/
+
+*.vti
+*.vtp
+*.vtu

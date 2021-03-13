@@ -1,0 +1,49 @@
+Q1: The value of %cr4 before _start is 0x00000000, and after the movl and orl commands it's 0x00000010.
+
+Q2: Kernel stack in bytes (entry.S:59). The kernel stack size is 0x00001000.
+
+Q3: name = "initcode\000\000\000\000\000\000\000"
+
+Q4: The scheduler() function in proc.c references the ptable struct, which store the
+process table. The ptable struct contains `struct proc proc[NPROC];`. `NPROC` is defined
+in param.h  as `#define NPROC        64  // maximum number of processes`. Thus the max
+number of processes is 64.
+
+Q5: To trigger the breakpoint in `exit`, you just need to run a process. I chose to run
+`ls`.
+
+Q6: After triggering an exit system call, a process first goes to the ZOMBIE state.
+
+Q7: From `p *myproc()`:
+
+```
+$4 = {sz = 12288, pgdir = 0x8dfc6000, 
+  kstack = 0x8df23000 "", state = RUNNING, pid = 4, 
+  parent = 0x80112dd0 <ptable+176>, 
+  tf = 0x8df23fb4, context = 0x8df23db0, 
+  chan = 0x0, killed = 0, ofile = {
+    0x8010fff4 <ftable+52>, 0x8010fff4 <ftable+52>, 
+    0x8010fff4 <ftable+52>, 
+    0x0 <repeats 13 times>}, 
+  cwd = 0x80110a14 <icache+52>, 
+  name = "ls", '\000' <repeats 13 times>}
+```
+
+So name is "ls" and the pid is 4. For the parent, I ran `p *myproc()->parent` and got:
+
+```
+$9 = {sz = 16384, pgdir = 0x8df73000, 
+  kstack = 0x8dffe000 "", state = SLEEPING, 
+  pid = 2, parent = 0x80112d54 <ptable+52>, 
+  tf = 0x8dffefb4, context = 0x8dffeebc, 
+  chan = 0x80112dd0 <ptable+176>, killed = 0, 
+  ofile = {0x8010fff4 <ftable+52>, 
+    0x8010fff4 <ftable+52>, 0x8010fff4 <ftable+52>, 
+    0x0 <repeats 13 times>}, 
+  cwd = 0x80110a14 <icache+52>, 
+  name = "sh", '\000' <repeats 13 times>}
+```
+
+So the parent name is "sh" and the pid is 2.
+
+
