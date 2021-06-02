@@ -1,5 +1,16 @@
 ParaViewTutorialData/
 
-*.vti
+*.vti*
+*.vts*
+*.vtk
 *.vtp
-*.vtu
+*.vtu*
+*.1dt
+*.zip
+*.mhd*
+*.raw
+*.uvf
+*.dat
+
+VH.pdf
+*.tar.gz
