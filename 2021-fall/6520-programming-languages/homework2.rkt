@@ -10,13 +10,14 @@
   ;; Added maxE
   (maxE [l : Exp]
          [r : Exp])
-  
+  ;; Modified arg to Listof Exp
   (appE [s : Symbol]
-        [arg : Exp]))
+        [arg : (Listof Exp)]))
 
+;; Modified arg to Listof Symbol
 (define-type Func-Defn
   (fd [name : Symbol] 
-      [arg : Symbol] 
+      [arg : (Listof Symbol)] 
       [body : Exp]))
 
 (module+ test
@@ -47,19 +48,34 @@
     [(s-exp-match? `{max ANY ANY} s)
      (maxE (parse (second (s-exp->list s)))
             (parse (third (s-exp->list s))))]
-    
-    [(s-exp-match? `{SYMBOL ANY} s)
+
+    ;; Added ... for functions with 1 or more args
+    [(s-exp-match? `{SYMBOL ANY ...} s)
      (appE (s-exp->symbol (first (s-exp->list s)))
-           (parse (second (s-exp->list s))))]
+           (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
 
 (define (parse-fundef [s : S-Exp]) : Func-Defn
   (cond
-    [(s-exp-match? `{define {SYMBOL SYMBOL} ANY} s)
+  
+    ;; Added match for 1 or more function arguments
+    [(s-exp-match? `{define {SYMBOL ANY ...} ANY} s)
      (fd (s-exp->symbol (first (s-exp->list (second (s-exp->list s)))))
-         (s-exp->symbol (second (s-exp->list (second (s-exp->list s)))))
+         (check-var-names (map s-exp->symbol (rest (s-exp->list (second (s-exp->list s))))))
          (parse (third (s-exp->list s))))]
     [else (error 'parse-fundef "invalid input")]))
+
+(define (check-var-names [syms : (Listof Symbol)]) : (Listof Symbol)
+  (type-case (Listof Symbol) syms
+    [empty empty]
+    [(cons s rst) (if (check-var-names-helper syms)
+                   (error 'check-var-names "bad syntax: repeated symbol")
+                   syms)]))
+
+(define (check-var-names-helper [syms : (Listof Symbol)]) : Boolean
+  (type-case (Listof Symbol) syms
+    [empty #f]
+    [(cons s rst) (or (member s rst) (check-var-names-helper rst))]))
 
 (module+ test
   (test (parse `2)
@@ -81,19 +97,42 @@
         (plusE (maxE (numE 2) (numE 1)) (maxE (numE -1) (numE 0))))
   
   (test (parse `{double 9})
-        (appE 'double (numE 9)))
+        (appE 'double (list (numE 9))))
   (test/exn (parse `{{+ 1 2}})
             "invalid input")
 
   (test (parse-fundef `{define {double x} {+ x x}})
-        (fd 'double 'x (plusE (idE 'x) (idE 'x))))
+        (fd 'double (list 'x) (plusE (idE 'x) (idE 'x))))
+  
+  
   (test/exn (parse-fundef `{def {f x} x})
             "invalid input")
 
   (define double-def
     (parse-fundef `{define {double x} {+ x x}}))
   (define quadruple-def
-    (parse-fundef `{define {quadruple x} {double {double x}}})))
+    (parse-fundef `{define {quadruple x} {double {double x}}}))
+
+  ;; Added parse and fundef-parse tests
+    (test (parse `{five})
+        (appE 'five empty))
+    (test (parse `{add 9 10})
+        (appE 'add (list (numE 9) (numE 10))))
+  (test (parse-fundef `{define {five} 5})
+        (fd 'five empty (numE 5)))
+  (test (parse-fundef `{define {add x y} {+ x y}})
+        (fd 'add (list 'x 'y) (plusE (idE 'x) (idE 'y))))
+
+  ;; check-var-names tests
+  (test (check-var-names empty)
+        empty)
+  (test (check-var-names (list 'x))
+        (list 'x))
+  (test/exn (check-var-names (list 'x 'x))
+        "bad syntax")
+  (test/exn (parse-fundef `{define {f x x} x})
+        "bad syntax")
+  )
 
 ;; interp ----------------------------------------
 (define (interp [a : Exp] [defs : (Listof Func-Defn)]) : Number
@@ -105,11 +144,17 @@
     ;; Added maxE
     [(maxE l r) (max (interp l defs) (interp r defs))]
     
-    [(appE s arg) (local [(define fd (get-fundef s defs))]
-                    (interp (subst (numE (interp arg defs))
+    [(appE s args) (local [(define fd (get-fundef s defs))]
+                    (interp (subst-list (interp-list args defs)
                                    (fd-arg fd)
                                    (fd-body fd))
                             defs))]))
+
+(define (interp-list [expns : (Listof Exp)] [defs : (Listof Func-Defn)]) : (Listof Exp)
+  (type-case (Listof Exp) expns
+      [empty empty]
+      [(cons e rst) (cons (numE (interp e defs)) (interp-list rst defs))]))
+  
 
 (module+ test
   (test (interp (parse `2) empty)
@@ -136,7 +181,26 @@
         16)
   (test (interp (parse `{quadruple 8})
                 (list double-def quadruple-def))
-        32))
+        32)
+
+  ;; Added new interp tests
+  (test (interp-list (list (parse `2)) empty)
+        (list (numE 2)))
+  (test (interp-list (list (parse `2) (parse `4) (parse `5)) empty)
+        (list (numE 2) (numE 4) (numE 5)))
+  (test (interp (parse `{f 1 2})
+                (list (parse-fundef `{define {f x y} {+ x y}})))
+        3)
+  (test (interp (parse `{+ {f} {f}})
+                (list (parse-fundef `{define {f} 5})))
+        10)
+  (test (interp (parse `{f 2 3})
+                (list (parse-fundef `{define {f x y} {+ y {+ x x}}})))
+        7)
+  (test/exn (interp (parse `{f 1})
+                    (list (parse-fundef `{define {f x y} {+ x y}})))
+            "wrong arity"))
+
 
 ;; get-fundef ----------------------------------------
 (define (get-fundef [s : Symbol] [defs : (Listof Func-Defn)]) : Func-Defn
@@ -173,7 +237,19 @@
     [(maxE l r) (maxE (subst what for l)
                       (subst what for r))]
     
-    [(appE s arg) (appE s (subst what for arg))]))
+    [(appE s args) (appE s (subst-args what for args))]))
+
+(define (subst-list [what : (Listof Exp)] [for : (Listof Symbol)] [in : Exp]) : Exp
+  (type-case (Listof Exp) what
+    [empty in]
+    [(cons e rst) (if (equal? (length what) (length for))
+                   (subst-list (rest what) (rest for) (subst (first what) (first for) in))
+                   (error 'subst-list "wrong arity"))]))
+
+(define (subst-args [what : Exp] [for : Symbol] [in : (Listof Exp)]) : (Listof Exp)
+  (type-case (Listof Exp) in
+    [empty empty]
+    [(cons e rst) (cons (subst what for e) (subst-args what for rst))]))
 
 (module+ test
   (test (subst (parse `8) 'x (parse `9))
@@ -192,4 +268,19 @@
         (parse `{max y 8}))
   
   (test (subst (parse `8) 'x (parse `{double x}))
-        (parse `{double 8})))
+        (parse `{double 8}))
+
+  ;; Add 2 subst with multiple args
+  (test (subst (parse `10) 'x (parse `{add x y}))
+        (parse `{add 10 y}))
+  (test (subst (parse `9) 'y (parse `{add x y}))
+        (parse `{add x 9}))
+
+  ;; Added test for subst-list
+   (test (subst-list (list (parse `8)) (list 'x) (parse `x))
+        (numE 8))
+  (test (subst-list (list (parse `8) (parse `9)) (list 'x 'y) (parse `{+ x y}))
+        (plusE (numE 8) (numE 9)))
+  (test (subst-list (list (parse `8) (parse `9)) (list 'y 'x) (parse `{+ x y}))
+        (plusE (numE 9) (numE 8)))
+  )
