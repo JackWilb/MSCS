@@ -31,8 +31,10 @@
 
   ;; Added equalE and ifE
   (equalE [lhs : Exp]
-        [rhs : Exp])
-  )
+          [rhs : Exp])
+  (ifE [con : Exp]
+       [t : Exp]
+       [f : Exp]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -72,9 +74,16 @@
      (lamE (s-exp->symbol (first (s-exp->list 
                                   (second (s-exp->list s)))))
            (parse (third (s-exp->list s))))]
+
+    ;; Add = and if
     [(s-exp-match? `{= ANY ANY} s)
      (equalE (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s))))]
+    [(s-exp-match? `{if ANY ANY ANY} s)
+     (ifE (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
+    
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -85,10 +94,20 @@
         (numE 2))
   (test (parse `x)
         (idE 'x))
+
+  ;; Added parse tests for boolE, equalE and if E
   (test (parse `true)
         (boolE #t))
   (test (parse `false)
         (boolE #f))
+  (test (parse `{= 1 2})
+        (equalE (numE 1) (numE 2)))
+  (test (parse `{if true 1 2})
+        (ifE (boolE #t) (numE 1) (numE 2)))
+  (test (parse `{if false {* 1 1} 2})
+        (ifE (boolE #f) (multE (numE 1) (numE 1)) (numE 2)))
+
+  
   (test (parse `{+ 2 1})
         (plusE (numE 2) (numE 1)))
   (test (parse `{* 3 4})
@@ -104,9 +123,6 @@
         (lamE 'x (numE 9)))
   (test (parse `{double 9})
         (appE (idE 'double) (numE 9)))
-
-  (test (parse `{= 1 2})
-        (equalE (numE 1) (numE 2)))
   
   (test/exn (parse `{{+ 1 2}})
             "invalid input"))
@@ -137,17 +153,18 @@
     [(equalE lhs rhs) (type-case Value (interp lhs env)
                         [(numV n)
                          (type-case Value (interp rhs env)
-                           [(numV n) (boolV (equal? lhs rhs))]
+                           [(numV n) (boolV (equal? (interp lhs env) (interp rhs env)))]
                            [else (error 'interp "not a number")])]
-                        [else (error 'interp "not a number")])]))
+                        [else (error 'interp "not a number")])]
+    [(ifE con t f) (type-case Value (interp con env)
+                     [(boolV b) (if b
+                                    (interp t env)
+                                    (interp f env))]
+                     [else (error 'interp "not a boolean")])]))
 
 (module+ test
   (test (interp (parse `2) mt-env)
         (numV 2))
-  (test (interp (parse `true) mt-env)
-        (boolV #t))
-  (test (interp (parse `false) mt-env)
-        (boolV #f))
   (test/exn (interp (parse `x) mt-env)
             "free variable")
   (test (interp (parse `x) 
@@ -181,7 +198,11 @@
                 mt-env)
         (numV 16))
   
-  ;; Added = func test
+  ;; Added true, false, =, and if func test
+  (test (interp (parse `true) mt-env)
+        (boolV #t))
+  (test (interp (parse `false) mt-env)
+        (boolV #f))
   (test (interp (parse `{= 1 1})
                 mt-env)
         (boolV #t))
@@ -200,6 +221,36 @@
   (test/exn (interp (parse `{= true true})
                 mt-env)
         "not a number")
+  (test (interp (parse `{if true {+ 1 2} 5})
+                mt-env)
+        (numV 3))
+  (test (interp (parse `{if false 1 2})
+                mt-env)
+        (numV 2))
+  (test (interp (parse `{if false 1 2})
+                mt-env)
+        (numV 2))
+  (test/exn (interp (parse `{if 1 2 3})
+                mt-env)
+        "not a boolean")
+
+  ;; tests from assignment
+  (test (interp (parse `{if {= 2 {+ 1 1}} 7 8})
+                mt-env)
+        (interp (parse `7)
+                mt-env))
+  (test (interp (parse `{if false {+ 1 {lambda {x} x}} 9})
+                mt-env)
+        (interp (parse `9)
+                mt-env))
+  (test (interp (parse `{if true 10 {+ 1 {lambda {x} x}}})
+                mt-env)
+        (interp (parse `10)
+                mt-env))
+  (test/exn (interp (parse `{if 1 2 3})
+                    mt-env)
+            "not a boolean")
+  
 
   (test/exn (interp (parse `{1 2}) mt-env)
             "not a function")
