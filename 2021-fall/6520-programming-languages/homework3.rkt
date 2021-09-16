@@ -29,12 +29,14 @@
   (appE [fun : Exp]
         [arg : Exp])
 
-  ;; Added equalE and ifE
+  ;; Added equalE, ifE, and unletE
   (equalE [lhs : Exp]
           [rhs : Exp])
   (ifE [con : Exp]
        [t : Exp]
-       [f : Exp]))
+       [f : Exp])
+  (unletE [n : Symbol]
+          [e : Exp]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -47,6 +49,14 @@
 
 (module+ test
   (print-only-errors #t))
+
+;; Added function to remove element from env (only first ocurrence)
+(define (remove-from-env [s : Symbol] [e : Env]) : Env
+  (type-case Env e
+    [empty empty]
+    [(cons fst rst) (if (equal? (bind-name fst) s)
+                        rst
+                        (extend-env fst (remove-from-env s rst)))]))
 
 ;; parse ----------------------------------------
 (define (parse [s : S-Exp]) : Exp
@@ -83,6 +93,9 @@
      (ifE (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s)))
           (parse (fourth (s-exp->list s))))]
+    [(s-exp-match? `{unlet ANY ANY} s)
+     (unletE (s-exp->symbol (second (s-exp->list s)))
+             (parse (third (s-exp->list s))))]
     
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
@@ -106,7 +119,10 @@
         (ifE (boolE #t) (numE 1) (numE 2)))
   (test (parse `{if false {* 1 1} 2})
         (ifE (boolE #f) (multE (numE 1) (numE 1)) (numE 2)))
-
+  (test (parse `{unlet x 2})
+        (unletE 'x (numE 2)))
+  (test (parse `{unlet y {* 1 2}})
+        (unletE 'y (multE (numE 1) (numE 2))))
   
   (test (parse `{+ 2 1})
         (plusE (numE 2) (numE 1)))
@@ -149,7 +165,7 @@
                                 c-env))]
                       [else (error 'interp "not a function")])]
 
-    ;; Added equalE
+    ;; Added equalE, ifE, and unletE
     [(equalE lhs rhs) (type-case Value (interp lhs env)
                         [(numV n)
                          (type-case Value (interp rhs env)
@@ -160,7 +176,8 @@
                      [(boolV b) (if b
                                     (interp t env)
                                     (interp f env))]
-                     [else (error 'interp "not a boolean")])]))
+                     [else (error 'interp "not a boolean")])]
+    [(unletE n e) (interp e (remove-from-env n env))]))
 
 (module+ test
   (test (interp (parse `2) mt-env)
@@ -250,6 +267,33 @@
   (test/exn (interp (parse `{if 1 2 3})
                     mt-env)
             "not a boolean")
+  (test/exn (interp (parse `{let {[x 1]}
+                              {unlet x
+                                     x}})
+                    mt-env)
+            "free variable")
+  (test (interp (parse `{let {[x 1]}
+                          {+ x {unlet x 1}}})
+                mt-env)
+        (interp (parse `2) mt-env))
+  (test (interp (parse `{let {[x 1]}
+                          {let {[x 2]}
+                            {+ x {unlet x x}}}})
+                mt-env)
+        (interp (parse `3) mt-env))
+  (test (interp (parse `{let {[x 1]}
+                          {let {[x 2]}
+                            {let {[z 3]}
+                              {+ x {unlet x {+ x z}}}}}})
+                mt-env)
+        (interp (parse `6) mt-env))
+  (test (interp (parse `{let {[f {lambda {z}
+                                   {let {[z 8]}
+                                     {unlet z
+                                            z}}}]}
+                          {f 2}})
+                mt-env)
+        (interp (parse `2) mt-env))
   
 
   (test/exn (interp (parse `{1 2}) mt-env)
