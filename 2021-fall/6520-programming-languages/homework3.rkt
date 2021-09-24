@@ -3,8 +3,10 @@
 (define-type Value
   (numV [n : Number])
 
-  ;; Added boolV
+  ;; Added boolV and thunkV
   (boolV [b : Boolean])
+  (thunkV [body : Exp]
+          [env : Env])
   
   (closV [arg : Symbol]
          [body : Exp]
@@ -29,14 +31,16 @@
   (appE [fun : Exp]
         [arg : Exp])
 
-  ;; Added equalE, ifE, and unletE
+  ;; Added equalE, ifE, unletE, delayE, and forceE
   (equalE [lhs : Exp]
           [rhs : Exp])
   (ifE [con : Exp]
        [t : Exp]
        [f : Exp])
   (unletE [n : Symbol]
-          [e : Exp]))
+          [e : Exp])
+  (delayE [e : Exp])
+  (forceE [e : Exp]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -57,6 +61,21 @@
     [(cons fst rst) (if (equal? (bind-name fst) s)
                         rst
                         (extend-env fst (remove-from-env s rst)))]))
+
+(module+ test
+  (test (remove-from-env 'x empty)
+        empty)
+  (test (remove-from-env 'x (extend-env (bind 'x (numV 1)) mt-env))
+        empty)
+  (test (remove-from-env 'y (extend-env (bind 'x (numV 1)) mt-env))
+        (extend-env (bind 'x (numV 1)) mt-env))
+  (test (remove-from-env 'x (extend-env
+                             (bind 'x (numV 2))
+                             (extend-env
+                              (bind 'x (numV 1))
+                              mt-env)))
+        (extend-env (bind 'x (numV 1)) mt-env)))
+
 
 ;; parse ----------------------------------------
 (define (parse [s : S-Exp]) : Exp
@@ -85,7 +104,7 @@
                                   (second (s-exp->list s)))))
            (parse (third (s-exp->list s))))]
 
-    ;; Add = and if
+    ;; Add =, if, unlet, delay, and force
     [(s-exp-match? `{= ANY ANY} s)
      (equalE (parse (second (s-exp->list s)))
           (parse (third (s-exp->list s))))]
@@ -96,6 +115,10 @@
     [(s-exp-match? `{unlet ANY ANY} s)
      (unletE (s-exp->symbol (second (s-exp->list s)))
              (parse (third (s-exp->list s))))]
+    [(s-exp-match? `{delay ANY} s)
+     (delayE (parse (second (s-exp->list s))))]
+    [(s-exp-match? `{force ANY} s)
+     (forceE (parse (second (s-exp->list s))))]
     
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
@@ -108,7 +131,7 @@
   (test (parse `x)
         (idE 'x))
 
-  ;; Added parse tests for boolE, equalE and if E
+  ;; Added parse tests for boolE, equalE, ifE, unlet, delay, and force
   (test (parse `true)
         (boolE #t))
   (test (parse `false)
@@ -123,6 +146,10 @@
         (unletE 'x (numE 2)))
   (test (parse `{unlet y {* 1 2}})
         (unletE 'y (multE (numE 1) (numE 2))))
+  (test (parse `{delay 2})
+        (delayE (numE 2)))
+  (test (parse `{force {delay 2}})
+        (forceE (delayE (numE 2))))
   
   (test (parse `{+ 2 1})
         (plusE (numE 2) (numE 1)))
@@ -165,7 +192,7 @@
                                 c-env))]
                       [else (error 'interp "not a function")])]
 
-    ;; Added equalE, ifE, and unletE
+    ;; Added equalE, ifE, unletE, delayE, and forceE
     [(equalE lhs rhs) (type-case Value (interp lhs env)
                         [(numV n)
                          (type-case Value (interp rhs env)
@@ -177,7 +204,12 @@
                                     (interp t env)
                                     (interp f env))]
                      [else (error 'interp "not a boolean")])]
-    [(unletE n e) (interp e (remove-from-env n env))]))
+    [(unletE n e) (interp e (remove-from-env n env))]
+    [(delayE e) (thunkV e env)]
+    [(forceE e) (local [(define thunk (interp e env))]
+                  (type-case Value thunk
+                    [(thunkV tb te) (interp tb te)]
+                    [else (error 'interp "not a thunk")]))]))
 
 (module+ test
   (test (interp (parse `2) mt-env)
@@ -215,7 +247,7 @@
                 mt-env)
         (numV 16))
   
-  ;; Added true, false, =, and if func test
+  ;; Added manual true, false, =, and if, delay, and force func test
   (test (interp (parse `true) mt-env)
         (boolV #t))
   (test (interp (parse `false) mt-env)
@@ -250,6 +282,18 @@
   (test/exn (interp (parse `{if 1 2 3})
                 mt-env)
         "not a boolean")
+  (test (interp (parse `{delay 1})
+                mt-env)
+        (thunkV (numE 1) mt-env))
+  (test (interp (parse `{delay {= 1 1}})
+                mt-env)
+        (thunkV (equalE (numE 1) (numE 1)) mt-env))
+  (test (interp (parse `{force {delay 1}})
+                mt-env)
+        (numV 1))
+  (test (interp (parse `{force {delay {= 1 1}}})
+                mt-env)
+        (boolV #t))
 
   ;; tests from assignment
   (test (interp (parse `{if {= 2 {+ 1 1}} 7 8})
@@ -305,6 +349,20 @@
                                 {bad 2}}})
                     mt-env)
             "free variable")
+  (test/exn (interp (parse `{force 1})
+                    mt-env)
+            "not a thunk")
+  (test (interp (parse `{force {if {= 8 8} {delay 7} {delay 9}}})
+                mt-env)
+        (interp (parse `7)
+                mt-env))
+  (test (interp (parse `{let {[d {let {[y 8]}
+                                   {delay {+ y 7}}}]}
+                          {let {[y 9]}
+                            {force d}}})
+                mt-env)
+        (interp (parse `15)
+                mt-env))
 
   #;
   (time (interp (parse `{let {[x2 {lambda {n} {+ n n}}]}
