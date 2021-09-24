@@ -27,8 +27,8 @@
   (unboxE [arg : Exp])
   (setboxE [bx : Exp]
            [val : Exp])
-  (beginE [l : Exp]
-          [r : Exp]))
+  ;; Modified to accept any number of exps
+  (beginE [exps : (Listof Exp)]))
 
 (define-type Binding
   (bind [name : Symbol]
@@ -96,9 +96,9 @@
     [(s-exp-match? `{set-box! ANY ANY} s)
      (setboxE (parse (second (s-exp->list s)))
               (parse (third (s-exp->list s))))]
-    [(s-exp-match? `{begin ANY ANY} s)
-     (beginE (parse (second (s-exp->list s)))
-             (parse (third (s-exp->list s))))]
+    ;; Modified begin to accept many exp
+    [(s-exp-match? `{begin ANY ...} s)
+     (beginE (map parse (rest (s-exp->list s))))]
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -131,9 +131,13 @@
   (test (parse `{set-box! b 0})
         (setboxE (idE 'b) (numE 0)))
   (test (parse `{begin 1 2})
-        (beginE (numE 1) (numE 2)))
+        (beginE (list (numE 1) (numE 2))))
   (test/exn (parse `{{+ 1 2}})
-            "invalid input"))
+            "invalid input")
+
+  ;; New tests
+  (test (parse `{begin})
+        (beginE empty)))
 
 ;; with form ----------------------------------------
 (define-syntax-rule
@@ -196,9 +200,16 @@
                  (update-store (cell l v-v)
                                  sto-v))]
            [else (error 'interp "not a box")])))]
-    [(beginE l r)
-     (with [(v-l sto-l) (interp l env sto)]
-       (interp r env sto-l))]))
+    [(beginE exps)
+     (type-case (Listof Exp) exps
+       [empty (error 'interp "no arguments passed to begin")]
+       [(cons fst rst) (cond
+                         [(empty? rst) (interp fst env sto)]
+                         [else (with [(v-fst sto-fst) (interp fst env sto)]
+                                     (interp (beginE rst) env sto-fst])])]))
+
+
+;; (interp r env sto-l)
 
 (module+ test
   (test (interp (parse `2) mt-env mt-store)
@@ -285,7 +296,7 @@
              (override-store (cell 1 (numV 6))
                                              mt-store)))
 
-  ;; new examples
+  ;; new tests
   (test (interp (parse `{let {[c {box 10}]}
                           {let {[b {box 5}]}
                             {begin
@@ -317,7 +328,21 @@
         (v*s (numV 2)
              (override-store (cell 1 (numV 2))
                              mt-store)))
-
+  (test/exn (interp (parse `{begin})
+                mt-env
+                mt-store)
+        "no arguments passed to begin")
+  (test (interp (parse `{let {[b {box 1}]}
+                          {begin
+                            {set-box! b {+ 2 {unbox b}}}
+                            {set-box! b {+ 3 {unbox b}}}
+                            {set-box! b {+ 4 {unbox b}}}
+                            {unbox b}}})
+                mt-env
+                mt-store)
+        (v*s (numV 10)
+             (override-store (cell 1 (numV 10))
+                             mt-store)))
   (test/exn (interp (parse `{1 2}) mt-env mt-store)
             "not a function")
   (test/exn (interp (parse `{+ 1 {lambda {x} x}}) mt-env mt-store)
