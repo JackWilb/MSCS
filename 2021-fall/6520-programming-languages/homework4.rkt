@@ -7,7 +7,9 @@
   (closV [arg : Symbol]
          [body : Exp]
          [env : Env])
-  (boxV [l : Location]))
+  (boxV [l : Location])
+  (recV [ns : (Listof Symbol)]
+        [vs : (Listof Result)]))
 
 (define-type Exp
   (numE [n : Number])
@@ -23,6 +25,13 @@
         [body : Exp])
   (appE [fun : Exp]
         [arg : Exp])
+  (recordE [ns : (Listof Symbol)]
+           [args : (Listof Exp)])
+  (getE [rec : Exp]
+        [n : Symbol])
+  (setE [rec : Exp]
+        [n : Symbol]
+        [val : Exp])
   (boxE [arg : Exp])
   (unboxE [arg : Exp])
   (setboxE [bx : Exp]
@@ -99,6 +108,18 @@
     ;; Modified begin to accept many exp
     [(s-exp-match? `{begin ANY ...} s)
      (beginE (map parse (rest (s-exp->list s))))]
+    [(s-exp-match? `{record {SYMBOL ANY} ...} s)
+     (recordE (map (lambda (l) (s-exp->symbol (first (s-exp->list l))))
+                   (rest (s-exp->list s)))
+              (map (lambda (l) (parse (second (s-exp->list l))))
+                   (rest (s-exp->list s))))]
+    [(s-exp-match? `{get ANY SYMBOL} s)
+     (getE (parse (second (s-exp->list s)))
+           (s-exp->symbol (third (s-exp->list s))))]
+    [(s-exp-match? `{set ANY SYMBOL ANY} s)
+     (setE (parse (second (s-exp->list s)))
+           (s-exp->symbol (third (s-exp->list s)))
+           (parse (fourth (s-exp->list s))))]
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -137,7 +158,14 @@
 
   ;; New tests
   (test (parse `{begin})
-        (beginE empty)))
+        (beginE empty))
+  (test (parse `{record {x 2} {y 3}})
+        (recordE (list 'x 'y)
+                 (list (numE 2) (numE 3))))
+  (test (parse `{get {+ 1 2} a})
+        (getE (plusE (numE 1) (numE 2)) 'a))
+  (test (parse `{set {+ 1 2} a 7})
+        (setE (plusE (numE 1) (numE 2)) 'a (numE 7))))
 
 ;; with form ----------------------------------------
 (define-syntax-rule
@@ -206,10 +234,27 @@
        [(cons fst rst) (cond
                          [(empty? rst) (interp fst env sto)]
                          [else (with [(v-fst sto-fst) (interp fst env sto)]
-                                     (interp (beginE rst) env sto-fst])])]))
-
-
-;; (interp r env sto-l)
+                                     (interp (beginE rst) env sto-fst))])])]
+    [(recordE ns as)
+     (type-case (Listof Exp) as
+       [empty (v*s (recV ns empty) sto)]
+       [(cons fst rst) (cond
+                         [(empty? rst) (v*s (recV ns (list (interp fst env sto)))
+                                            sto)]
+                         [else (with [(v-fst sto-fst) (interp fst env sto)]
+                                     (v*s (recV ns (cons
+                                                   (interp fst env sto)
+                                                   (map (lambda (x) (interp x env sto-fst)) rst)))
+                                          sto))])])]
+    [(getE a n) (local [(define vstars (interp a env sto))]
+                  (type-case Value (v*s-v vstars)
+                    [(recV ns vs) (find n ns vs)]
+                    [else (error 'interp "not a record")]))]
+    [(setE a n v) (local [(define vstars (interp a env sto))]
+                    (type-case Value (v*s-v vstars)
+                      [(recV ns vs)
+                       (v*s (recV ns (update n (interp v env sto) ns vs)) sto)]
+                      [else (error 'interp "not a record")]))]))
 
 (module+ test
   (test (interp (parse `2) mt-env mt-store)
@@ -343,6 +388,14 @@
         (v*s (numV 10)
              (override-store (cell 1 (numV 10))
                              mt-store)))
+  (test (interp (parse `{record {a {+ 1 1}}
+                                {b {+ 2 2}}})
+                mt-env
+                mt-store)
+        (v*s (recV (list 'a 'b) 
+              (list (v*s (numV 2) mt-store) (v*s (numV 4) mt-store)))
+             mt-store))
+  
   (test/exn (interp (parse `{1 2}) mt-env mt-store)
             "not a function")
   (test/exn (interp (parse `{+ 1 {lambda {x} x}}) mt-env mt-store)
@@ -357,6 +410,36 @@
                     mt-env
                     mt-store)
             "free variable"))
+
+;; interp-expr -----------------------------------------
+
+(define (interp-expr [parsed : Exp]): S-Exp
+  (local [(define interped (interp parsed mt-env mt-store))]
+    (type-case Value (v*s-v interped)
+      [(numV n) (number->s-exp n)]
+      [(closV a b e) `function]
+      [(boxV l) `box]
+      [(recV ns vs) `record])))
+
+(module+ test
+  (test (interp-expr (parse `{+ 1 4}))
+        `5)
+  (test (interp-expr (parse `{record {a 10} {b {+ 1 2}}}))
+        `record)
+  (test (interp-expr (parse `{get {record {a 10} {b {+ 1 0}}} b}))
+        `1)
+  (test/exn (interp-expr (parse `{get {record {a 10}} b}))
+            "no such field")
+  (test (interp-expr (parse `{get {record {r {record {z 0}}}} r}))
+        `record)
+  (test (interp-expr (parse `{get {get {record {r {record {z 0}}}} r} z}))
+        `0)
+  (test (interp-expr (parse `{let {[b {box 0}]}
+                               {let {[r {record {a {unbox b}}}]}
+                                 {begin
+                                   {set-box! b 1}
+                                   {get r a}}}}))
+        `0))
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (Number Number -> Number)] [l : Value] [r : Value]) : Value
@@ -438,3 +521,43 @@
   (test/exn (fetch 2 mt-store)
             "unallocated location"))
 
+;; find & update ----------------------------------------
+
+;; Takes a name and two parallel lists, returning an item from the
+;; second list where the name matches the item from the first list.
+(define (find [n : Symbol] [ns : (Listof Symbol)] [vs : (Listof Result)])
+  : Result
+  (cond
+   [(empty? ns) (error 'interp "no such field")]
+   [else (if (symbol=? n (first ns))
+             (first vs)
+             (find n (rest ns) (rest vs)))]))
+
+;; Takes a name n, value v, and two parallel lists, returning a list
+;; like the second of the given lists, but with v in place
+;; where n matches the item from the first list.
+(define (update [n : Symbol]
+                [v : Result]
+                [ns : (Listof Symbol)]
+                [vs : (Listof Result)]) : (Listof Result)
+  (cond
+    [(empty? ns) (error 'interp "no such field")]
+    [else (if (symbol=? n (first ns))
+              (cons v (rest vs))
+              (cons (first vs) 
+                    (update n v (rest ns) (rest vs))))]))
+
+(module+ test
+  (test (find 'a (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
+        (v*s (numV 1) mt-store))
+  (test (find 'b (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
+        (v*s (numV 2) mt-store))
+  (test/exn (find 'a empty empty)
+            "no such field")
+
+  (test (update 'a (v*s (numV 0) mt-store) (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
+        (list (v*s (numV 0) mt-store) (v*s (numV 2) mt-store)))
+  (test (update 'b (v*s (numV 0) mt-store) (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
+        (list (v*s (numV 1) mt-store) (v*s (numV 0) mt-store)))
+  (test/exn (update 'a (v*s (numV 0) mt-store) empty empty)
+            "no such field"))
