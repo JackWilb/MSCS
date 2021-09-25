@@ -32,6 +32,9 @@
   (setE [rec : Exp]
         [n : Symbol]
         [val : Exp])
+  (set!E [rec : Exp]
+        [n : Symbol]
+        [val : Exp])
   (boxE [arg : Exp])
   (unboxE [arg : Exp])
   (setboxE [bx : Exp]
@@ -120,6 +123,10 @@
      (setE (parse (second (s-exp->list s)))
            (s-exp->symbol (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
+    [(s-exp-match? `{set! ANY SYMBOL ANY} s)
+     (set!E (parse (second (s-exp->list s)))
+           (s-exp->symbol (third (s-exp->list s)))
+           (parse (fourth (s-exp->list s))))]
     [(s-exp-match? `{ANY ANY} s)
      (appE (parse (first (s-exp->list s)))
            (parse (second (s-exp->list s))))]
@@ -165,7 +172,9 @@
   (test (parse `{get {+ 1 2} a})
         (getE (plusE (numE 1) (numE 2)) 'a))
   (test (parse `{set {+ 1 2} a 7})
-        (setE (plusE (numE 1) (numE 2)) 'a (numE 7))))
+        (setE (plusE (numE 1) (numE 2)) 'a (numE 7)))
+(test (parse `{set! {+ 1 2} a 7})
+        (set!E (plusE (numE 1) (numE 2)) 'a (numE 7))))
 
 ;; with form ----------------------------------------
 (define-syntax-rule
@@ -254,7 +263,8 @@
                     (type-case Value (v*s-v vstars)
                       [(recV ns vs)
                        (v*s (recV ns (update n (interp v env sto) ns vs)) sto)]
-                      [else (error 'interp "not a record")]))]))
+                      [else (error 'interp "not a record")]))]
+    [(set!E a n v) ....]))
 
 (module+ test
   (test (interp (parse `2) mt-env mt-store)
@@ -395,6 +405,19 @@
         (v*s (recV (list 'a 'b) 
               (list (v*s (numV 2) mt-store) (v*s (numV 4) mt-store)))
              mt-store))
+  (test (interp (parse `{set {record {a {+ 1 1}}
+                                     {b {+ 2 2}}} a 5})
+                mt-env
+                mt-store)
+        (v*s (recV (list 'a 'b) 
+                   (list (v*s (numV 5) mt-store) (v*s (numV 4) mt-store)))
+             mt-store))
+  (test (interp (parse `{record })
+                mt-env
+                mt-store)
+        (v*s (recV (list ) 
+                   (list ))
+             mt-store))
   
   (test/exn (interp (parse `{1 2}) mt-env mt-store)
             "not a function")
@@ -409,7 +432,14 @@
                                 {bad 2}}})
                     mt-env
                     mt-store)
-            "free variable"))
+            "free variable")
+  (test/exn (interp (parse `{get 6 x}) mt-env mt-store)
+            "not a record")
+  (test/exn (interp (parse `{set 6 x 9}) mt-env mt-store)
+            "not a record")
+  (test/exn (interp (parse `{set! 6 x 9}) mt-env mt-store)
+            "not a record")
+  )
 
 ;; interp-expr -----------------------------------------
 
@@ -439,7 +469,39 @@
                                  {begin
                                    {set-box! b 1}
                                    {get r a}}}}))
-        `0))
+        `0)
+
+  ;; 6520 tests
+  (test (interp-expr (parse `{let {[r {record {x 1}}]}
+                               {get r x}}))
+        `1)
+
+  (test (interp-expr (parse `{let {[r {record {x 1}}]}
+                               {begin
+                                 {set! r x 5}
+                                 {get r x}}}))
+        `5)
+
+  (test (interp-expr (parse `{let {[r {record {x 1}}]}
+                               {let {[get-r {lambda {d} r}]}
+                                 {begin
+                                   {set! {get-r 0} x 6}
+                                   {get {get-r 0} x}}}}))
+        `6)
+
+  (test (interp-expr (parse `{let {[g {lambda {r} {get r a}}]}
+                               {let {[s {lambda {r} {lambda {v} {set! r b v}}}]}
+                                 {let {[r1 {record {a 0} {b 2}}]}
+                                   {let {[r2 {record {a 3} {b 4}}]}
+                                     {+ {get r1 b}
+                                        {begin
+                                          {{s r1} {g r2}}
+                                          {+ {begin
+                                               {{s r2} {g r1}}
+                                               {get r1 b}}
+                                             {get r2 b}}}}}}}}))
+        `5)
+  )
 
 ;; num+ and num* ----------------------------------------
 (define (num-op [op : (Number Number -> Number)] [l : Value] [r : Value]) : Value
