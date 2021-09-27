@@ -9,7 +9,7 @@
          [env : Env])
   (boxV [l : Location])
   (recV [ns : (Listof Symbol)]
-        [vs : (Listof Result)]))
+        [vs : (Listof Value)]))
 
 (define-type Exp
   (numE [n : Number])
@@ -247,24 +247,53 @@
     [(recordE ns as)
      (type-case (Listof Exp) as
        [empty (v*s (recV ns empty) sto)]
-       [(cons fst rst) (cond
-                         [(empty? rst) (v*s (recV ns (list (interp fst env sto)))
-                                            sto)]
-                         [else (with [(v-fst sto-fst) (interp fst env sto)]
-                                     (v*s (recV ns (cons
-                                                   (interp fst env sto)
-                                                   (map (lambda (x) (interp x env sto-fst)) rst)))
-                                          sto))])])]
+       [(cons fst rst) (with [(v-fst sto-fst) (interp (boxE fst) env sto)]
+                             (cond
+                               [(empty? rst) (v*s (recV ns (list v-fst))
+                                                  sto-fst)]
+                               [else (let ([all-interped (interp-accum as env sto)])
+                                       (v*s (recV ns (map (lambda (x) (v*s-v x)) all-interped))
+                                           (v*s-s (first (reverse all-interped)))))]))])]
     [(getE a n) (local [(define vstars (interp a env sto))]
                   (type-case Value (v*s-v vstars)
-                    [(recV ns vs) (find n ns vs)]
+                    [(recV ns vs) (let ([b (find n ns vs)])
+                                    (type-case Value b
+                                      [(boxV l) (v*s (fetch l (v*s-s vstars)) 
+                                                     (v*s-s vstars))]
+                                      [else (error 'interp "not a box")]))]
                     [else (error 'interp "not a record")]))]
     [(setE a n v) (local [(define vstars (interp a env sto))]
                     (type-case Value (v*s-v vstars)
                       [(recV ns vs)
-                       (v*s (recV ns (update n (interp v env sto) ns vs)) sto)]
+                       (v*s (recV ns (update n (v*s-v (interp v env sto)) ns vs)) sto)]
                       [else (error 'interp "not a record")]))]
-    [(set!E a n v) ....]))
+    [(set!E a n v) (with [(r-v r-sto) (interp a env sto)]
+                  (type-case Value r-v
+                    [(recV ns vs) (let ([b (find n ns vs)])
+                                    (with [(v-v sto-v) (interp v env sto)]
+                                    (type-case Value b
+                                      [(boxV l) (v*s (recV ns vs) (update-store (cell l v-v)
+                                                                                r-sto))]
+                                      [else (error 'interp "not a box")])))]
+                    [else (error 'interp "not a record")]))]))
+
+(define (interp-accum [exps : (Listof Exp)] [env : Env] [store : Store]) : (Listof Result)
+  (type-case (Listof Exp) exps
+    [empty empty]
+    [(cons fst rst) (with [(v-fst sto-fst) (interp (boxE fst) env store)]
+                          (cons (interp (boxE fst) env store) (interp-accum rst env sto-fst)))]))
+
+(module+ test
+  (test (interp-accum empty mt-env mt-store)
+        empty)
+   (test (interp-accum (list (numE 2)) mt-env mt-store)
+         (list (v*s (boxV 1) (override-store (cell 1 (numV 2)) mt-store))))
+  (test (interp-accum (list (numE 2) (numE 1)) mt-env mt-store)
+         (list
+          (v*s (boxV 1) (override-store (cell 1 (numV 2)) mt-store))
+          (v*s (boxV 2) (override-store (cell 2 (numV 1))
+                                             (override-store (cell 1 (numV 2))
+                                                             mt-store))))))
 
 (module+ test
   (test (interp (parse `2) mt-env mt-store)
@@ -403,15 +432,23 @@
                 mt-env
                 mt-store)
         (v*s (recV (list 'a 'b) 
-              (list (v*s (numV 2) mt-store) (v*s (numV 4) mt-store)))
-             mt-store))
-  (test (interp (parse `{set {record {a {+ 1 1}}
-                                     {b {+ 2 2}}} a 5})
+              (list (boxV 1) (boxV 2)))
+             (override-store (cell 2 (numV 4))
+                             (override-store (cell 1 (numV 2))
+                                             mt-store))))
+  (test (interp (parse `{record {a {+ 1 1}}})
                 mt-env
                 mt-store)
-        (v*s (recV (list 'a 'b) 
-                   (list (v*s (numV 5) mt-store) (v*s (numV 4) mt-store)))
-             mt-store))
+        (v*s (recV (list 'a) 
+                   (list (boxV 1)))
+                   (override-store (cell 1 (numV 2)) mt-store)))
+  ;(test (interp (parse `{set {record {a {+ 1 1}}
+  ;                                   {b {+ 2 2}}} a 5})
+  ;              mt-env
+  ;              mt-store)
+  ;      (v*s (recV (list 'a 'b) 
+  ;                 (list (v*s (numV 5) mt-store) (v*s (numV 4) mt-store)))
+  ;           mt-store))
   (test (interp (parse `{record })
                 mt-env
                 mt-store)
@@ -587,8 +624,8 @@
 
 ;; Takes a name and two parallel lists, returning an item from the
 ;; second list where the name matches the item from the first list.
-(define (find [n : Symbol] [ns : (Listof Symbol)] [vs : (Listof Result)])
-  : Result
+(define (find [n : Symbol] [ns : (Listof Symbol)] [vs : (Listof Value)])
+  : Value
   (cond
    [(empty? ns) (error 'interp "no such field")]
    [else (if (symbol=? n (first ns))
@@ -599,9 +636,9 @@
 ;; like the second of the given lists, but with v in place
 ;; where n matches the item from the first list.
 (define (update [n : Symbol]
-                [v : Result]
+                [v : Value]
                 [ns : (Listof Symbol)]
-                [vs : (Listof Result)]) : (Listof Result)
+                [vs : (Listof Value)]) : (Listof Value)
   (cond
     [(empty? ns) (error 'interp "no such field")]
     [else (if (symbol=? n (first ns))
@@ -610,16 +647,16 @@
                     (update n v (rest ns) (rest vs))))]))
 
 (module+ test
-  (test (find 'a (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
-        (v*s (numV 1) mt-store))
-  (test (find 'b (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
-        (v*s (numV 2) mt-store))
+  (test (find 'a (list 'a 'b) (list (numV 1) (numV 2)))
+        (numV 1))
+  (test (find 'b (list 'a 'b) (list (numV 1) (numV 2)))
+        (numV 2))
   (test/exn (find 'a empty empty)
             "no such field")
 
-  (test (update 'a (v*s (numV 0) mt-store) (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
-        (list (v*s (numV 0) mt-store) (v*s (numV 2) mt-store)))
-  (test (update 'b (v*s (numV 0) mt-store) (list 'a 'b) (list (v*s (numV 1) mt-store) (v*s (numV 2) mt-store)))
-        (list (v*s (numV 1) mt-store) (v*s (numV 0) mt-store)))
-  (test/exn (update 'a (v*s (numV 0) mt-store) empty empty)
+  (test (update 'a (numV 0) (list 'a 'b) (list (numV 1) (numV 2)))
+        (list (numV 0) (numV 2)))
+  (test (update 'b (numV 0) (list 'a 'b) (list (numV 1) (numV 2)))
+        (list (numV 1) (numV 0)))
+  (test/exn (update 'a (numV 0) empty empty)
             "no such field"))
