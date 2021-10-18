@@ -316,7 +316,63 @@
                                   {{list-ref {+ n -1}} {snd l}}}}}}}]}
                  ;; Call list-ref on infinite list:
                  {{list-ref 4} {nats-from 2}}}}}))
-        `6))
+        `6)
+    (test (interp-expr 
+         (parse 
+          `{let {[mkrec
+                  {lambda {body-proc}
+                    {let {[fX {lambda {fX}
+                                {body-proc {fX fX}}}]}
+                      {fX fX}}}]}
+             {let {[nats-to
+                    {mkrec
+                     {lambda {nats-to}
+                       {lambda {n}
+                         {if0 n
+                              {pair 0 0}
+                              {let {[l {nats-to {+ n -1}}]}
+                                {pair {+ {fst l} 1}
+                                      l}}}}}}]}
+               {let {[sum
+                      {mkrec
+                       {lambda {sum}
+                         {lambda {n}
+                           {lambda {l}
+                             {if0 n
+                                  0
+                                  {+ {fst l}
+                                     {{sum {+ n -1}} {snd l}}}}}}}}]}
+                 {{sum 10000} {nats-to 10000}}}}}))
+        `50005000)
+
+  (test (interp-expr 
+         (parse 
+          `{let {[mkrec
+                  {lambda {body-proc}
+                    {let {[fX {lambda {fX}
+                                {body-proc {fX fX}}}]}
+                      {fX fX}}}]}
+             {let {[nats-to
+                    {mkrec
+                     {lambda {nats-to}
+                       {lambda {n}
+                         {if0 n
+                              {pair 0 0}
+                              {let {[l {nats-to {+ n -1}}]}
+                                {pair l
+                                      {+ {snd l} 1}}}}}}}]}
+               {let {[sum
+                      {mkrec
+                       {lambda {sum}
+                         {lambda {n}
+                           {lambda {l}
+                             {if0 n
+                                  0
+                                  {+ {snd l}
+                                     {{sum {+ n -1}} {fst l}}}}}}}}]}
+                 {{sum 10000} {nats-to 10000}}}}}))
+        `50005000)
+  )
 
 ;; force ----------------------------------------
 
