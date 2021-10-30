@@ -50,10 +50,16 @@
                [k : Cont])
   (doMultK [v : Value]
            [k : Cont])
-  (appArgK [a : Exp]
+  (appArgK [a : (Listof Exp)]
            [env : Env]
            [k : Cont])
-  (doAppK [f : Value]
+  (appNextArgK [p : (Listof Value)]
+               [a : (Listof Exp)]
+               [fun : Value]
+               [env : Env]
+               [k : Cont])
+  (doAppK [p : (Listof Value)]
+          [f : Value]
           [k : Cont])
   (doNegK [k : Cont])
   (avgSecondK [s : Exp]
@@ -93,7 +99,7 @@
        (appE (lamE (list (s-exp->symbol (first bs)))
                    (parse (third (s-exp->list s))))
              (list (parse (second bs)))))]
-    [(s-exp-match? `{lambda {SYMBOL} ANY} s)
+    [(s-exp-match? `{lambda {SYMBOL ...} ANY} s)
      (lamE (map s-exp->symbol (s-exp->list 
                                (second (s-exp->list s))))
            (parse (third (s-exp->list s))))]
@@ -112,7 +118,7 @@
            (parse (third (s-exp->list s)))
            (parse (fourth (s-exp->list s))))]
 
-    [(s-exp-match? `{ANY ANY} s)
+    [(s-exp-match? `{ANY ANY ...} s)
      (appE (parse (first (s-exp->list s)))
            (map parse (rest (s-exp->list s))))]
     [else (error 'parse "invalid input")]))
@@ -154,7 +160,7 @@
     [(lamE ns body)
      (continue k (closV ns body env))]
     [(appE fun args) (interp fun env
-                             (appArgK (first args) env k))]
+                             (appArgK args env k))]
     [(let/ccE n body)
      (interp body
              (extend-env (bind n (contV k))
@@ -181,14 +187,27 @@
     [(doMultK v-l next-k)
      (continue next-k (num* v-l v))]
     [(appArgK a env next-k)
-     (interp a env
-             (doAppK v next-k))]
-    [(doAppK v-f next-k)
+     (type-case Value v
+       [(contV k) (if (equal? (length a) 1)
+                      (interp (first a) env
+                              (appNextArgK (list ) (rest a) v env next-k))
+                      (error 'interp "wrong args for continuation"))]
+       [else (if (equal? (length a) 0)
+                 (continue (doAppK (list ) v next-k) v)
+                 (interp (first a) env
+                         (appNextArgK (list ) (rest a) v env next-k)))])]
+     
+    [(appNextArgK p a fun env next-k)
+     (type-case (Listof Exp) a
+       [empty (continue (doAppK (cons v p) fun next-k) v)]
+       [(cons fst rst) (interp (first a) env
+             (appNextArgK (cons v p) (rest a) fun env next-k))])]
+    [(doAppK p v-f next-k)
      (type-case Value v-f
        [(closV ns body c-env)
         (interp body
                 (extend-env*
-                 (map2 bind ns (list v))
+                 (map2 bind ns (reverse p))
                  c-env)
                 next-k)]
        [(contV k-v) (continue k-v v)]
@@ -296,10 +315,13 @@
         (numV 30))
   (test (continue (doMultK (numV 7) (doneK)) (numV 5))
         (numV 35))
-  (test (continue (appArgK (numE 5) mt-env (doneK)) (closV (list 'x) (idE 'x) mt-env))
+  (test (continue (appArgK (list (numE 5)) mt-env (doneK)) (closV (list 'x) (idE 'x) mt-env))
         (numV 5))
-  (test (continue (doAppK (closV (list 'x) (idE 'x) mt-env) (doneK)) (numV 8))
+  (test (continue (doAppK (list (numV 8)) (closV (list 'x) (idE 'x) mt-env) (doneK)) (numV 8))
         (numV 8))
+
+  (test (interp-expr (parse `{let/cc k k}))
+        `function)
 
   (test (interp-expr (parse `{neg 2}))
         `-2)
@@ -317,6 +339,31 @@
         `2)
   (test (interp-expr (parse `{let/cc k {if0 {k 9} 2 3}}))
         `9)
+
+  (test (interp-expr (parse `{{lambda {x y} {+ y {neg x}}} 10 12}))
+        `2)
+  (test (interp-expr (parse `{lambda {} 12}))
+        `function)
+  (test (interp-expr (parse `{lambda {x} {lambda {} x}}))
+        `function)
+  (test (interp-expr (parse `{{{lambda {x} {lambda {} x}} 13}}))
+        `13)
+
+  (test (interp-expr (parse `{let/cc esc {{lambda {x y} x} 1 {esc 3}}}))
+        `3)
+  (test (interp-expr (parse `{{let/cc esc {{lambda {x y} {lambda {z} {+ z y}}}
+                                           1 
+                                           {let/cc k {esc k}}}}
+                              10}))
+        `20)
+
+  (test/exn (interp-expr (parse `{let/cc esc {esc}}))
+            ;; error because continuation is given 0 arguments,
+            ;; but the specific error message is not specified
+            "")
+  (test/exn (interp-expr (parse `{let/cc esc {esc 1 2}}))
+            ;; error because continuation is given 2 arguments
+            "")
 
   (test/exn (interp-expr (parse `{let {[bad {lambda {x} {+ x y}}]}
                                    {neg bad}}))
