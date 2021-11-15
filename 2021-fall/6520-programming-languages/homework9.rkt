@@ -11,6 +11,8 @@
          [rhs : Exp])
   (argE)
   (thisE)
+  (selectE [lhs : Exp]
+           [rhs : Exp])
   (newE [class-name : Symbol]
         [args : (Listof Exp)])
   (getE [obj-expr : Exp]
@@ -68,6 +70,25 @@
         [(multE l r) (num* (recur l) (recur r))]
         [(thisE) this-val]
         [(argE) arg-val]
+        [(selectE l r)
+         (local [(define l-val (recur l))]
+           (type-case Value l-val
+             [(numV n)
+              (local [(define r-val (recur r))]
+                (type-case Value r-val
+                  [(objV cn fv)
+                   (try (if (equal? 0 n)
+                       (interp (sendE r 'zero (numE 0))
+                               classes
+                               this-val
+                               arg-val)
+                       (interp (sendE r 'nonzero (numE 0))
+                               classes
+                               this-val
+                               arg-val))
+                        (lambda () (error 'interp "method missing")))]
+                  [else (error 'interp "not an object")]))]
+             [else (error 'interp "not a number")]))]
         [(newE class-name field-exprs)
          (local [(define c (find classes class-name))
                  (define vals (map recur field-exprs))]
@@ -204,6 +225,8 @@
          [rhs : ExpI])
   (argI)
   (thisI)
+  (selectI [lhs : ExpI]
+         [rhs : ExpI]) 
   (newI [class-name : Symbol]
         [args : (Listof ExpI)])
   (getI [obj-expr : ExpI]
@@ -233,6 +256,7 @@
       [(multI l r) (multE (recur l) (recur r))]
       [(argI) (argE)]
       [(thisI) (thisE)]
+      [(selectI l r) (selectE (recur l) (recur r))]
       [(newI class-name field-exprs)
        (newE class-name (map recur field-exprs))]
       [(getI expr field-name)
@@ -488,6 +512,9 @@
    [(s-exp-match? `NUMBER s) (numI (s-exp->number s))]
    [(s-exp-match? `arg s) (argI)]
    [(s-exp-match? `this s) (thisI)]
+   [(s-exp-match? `{select ANY ANY} s)
+    (selectI (parse (second (s-exp->list s)))
+           (parse (third (s-exp->list s))))]
    [(s-exp-match? `{+ ANY ANY} s)
     (plusI (parse (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
@@ -593,4 +620,46 @@
   (test (interp-prog (list `{class Fish extends Object
                                {size color}})
                      `{new Object})
-        `object))
+        `object)
+  (test (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [zero {arg} this]
+                              [nonzero {arg}
+                                       {new Snowball {+ 1 {get this size}}}]})
+                     `{get {select 0 {new Snowball 1}} size})
+        `1)
+  (test (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [zero {arg} this]
+                              [nonzero {arg}
+                                       {new Snowball {+ 1 {get this size}}}]})
+                     `{get {select {+ 1 2} {new Snowball 1}} size})
+        `2)
+
+
+
+  (test/exn (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [zero {arg} this]
+                              [nonzero {arg}
+                                       {new Snowball {+ 1 {get this size}}}]})
+                     `{get {select {new Snowball 1} {new Snowball 1}} size})
+        "not a number")
+  (test/exn (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [zero {arg} this]
+                              [nonzero {arg}
+                                       {new Snowball {+ 1 {get this size}}}]})
+                     `{get {select 0 1} size})
+        "not an object")
+  (test/exn (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [nonzero {arg}
+                                       {new Snowball {+ 1 {get this size}}}]})
+                     `{get {select 0 {new Snowball 1}} size})
+        "method missing")
+  (test/exn (interp-prog (list `{class Snowball extends Object
+                              {size}
+                              [zero {arg} this]})
+                     `{get {select 1 {new Snowball 1}} size})
+        "method missing"))
