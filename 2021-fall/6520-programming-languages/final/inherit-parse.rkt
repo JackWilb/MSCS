@@ -37,6 +37,11 @@
    [(s-exp-match? `NUMBER s) (numI (s-exp->number s))]
    [(s-exp-match? `arg s) (argI)]
    [(s-exp-match? `this s) (thisI)]
+
+   [(s-exp-match? `{cast SYMBOL ANY} s)
+    (castI (s-exp->symbol (second (s-exp->list s)))
+           (parse (third (s-exp->list s))))]
+   
    [(s-exp-match? `{+ ANY ANY} s)
     (plusI (parse (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
@@ -59,6 +64,9 @@
    [else (error 'parse "invalid input")]))
 
 (module+ test
+  (test (parse `{cast Object this})
+        (castI 'Object (thisI)))
+  
   (test (parse `0)
         (numI 0))
   (test (parse `arg)

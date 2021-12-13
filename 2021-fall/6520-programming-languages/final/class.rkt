@@ -1,6 +1,9 @@
 #lang plait
 
 (define-type Exp
+  (castE [to : Symbol]
+         [obj : Exp])
+  
   (numE [n : Number])
   (plusE [lhs : Exp]
          [rhs : Exp])
@@ -21,7 +24,8 @@
           [arg-expr : Exp]))
 
 (define-type Class
-  (classC [field-names : (Listof Symbol)]
+  (classC [super-name : Symbol]
+          [field-names : (Listof Symbol)]
           [methods : (Listof (Symbol * Exp))]))
 
 (define-type Value
@@ -60,6 +64,14 @@
     (local [(define (recur expr)
               (interp expr classes this-val arg-val))]
       (type-case Exp a
+        [(castE to obj-expr)
+         (type-case Value (recur obj-expr)
+           [(objV class-name field-vals)
+            (if (inherits-from to class-name (reverse classes))
+                (objV class-name field-vals)
+                (error 'interp "cannot cast to that"))]
+           [else (error 'interp "not an object")])]
+        
         [(numE n) (numV n)]
         [(plusE l r) (num+ (recur l) (recur r))]
         [(multE l r) (num* (recur l) (recur r))]
@@ -75,7 +87,7 @@
          (type-case Value (recur obj-expr)
            [(objV class-name field-vals)
             (type-case Class (find classes class-name)
-              [(classC field-names methods)
+              [(classC super-name field-names methods)
                (find (map2 (lambda (n v) (values n v))
                            field-names
                            field-vals)
@@ -98,7 +110,7 @@
 (define (call-method class-name method-name classes
                      obj arg-val)
   (type-case Class (find classes class-name)
-    [(classC field-names methods)
+    [(classC super-name field-names methods)
      (let ([body-expr (find methods method-name)])
        (interp body-expr
                classes
@@ -123,7 +135,7 @@
 (module+ test
   (define posn-class
     (values 'Posn
-            (classC 
+            (classC 'Object
              (list 'x 'y)
              (list (values 'mdist
                            (plusE (getE (thisE) 'x) (getE (thisE) 'y)))
@@ -137,7 +149,7 @@
     
   (define posn3D-class
     (values 'Posn3D
-            (classC 
+            (classC 'Posn
              (list 'x 'y 'z)
              (list (values 'mdist (plusE (getE (thisE) 'z)
                                          (ssendE (thisE) 'Posn 'mdist (argE))))
@@ -152,6 +164,15 @@
 ;; ----------------------------------------
 
 (module+ test
+  (test (interp-posn (castE 'Object posn27))
+        (objV 'Posn (list (numV 2) (numV 7))))
+  (test (interp-posn (castE 'Posn posn27))
+        (objV 'Posn (list (numV 2) (numV 7))))
+  (test/exn (interp-posn (castE 'Posn3D posn27))
+            "cannot cast to that")
+  (test/exn (interp-posn (castE 'Object (numE 2)))
+            "not an object")
+  
   (test (interp (numE 10) 
                 empty (objV 'Object empty) (numV 0))
         (numV 10))
@@ -189,3 +210,37 @@
             "not an object")
   (test/exn (interp-posn (newE 'Posn (list (numE 0))))
             "wrong field count"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;; new helpers
+
+(define (inherits-from [name : Symbol] [obj-class-name : Symbol] [classes : (Listof (Symbol * Class))]) : Boolean
+  (type-case (Listof (Symbol * Class)) classes
+    [empty #f]
+    [(cons f r) (if (equal? obj-class-name (fst f))
+                    (type-case Class (snd f)
+                      [(classC super-name fields methods)
+                       (if (or (equal? name obj-class-name) (equal? name super-name))
+                           #t
+                           (inherits-from name super-name r))])
+                    (inherits-from name obj-class-name r))]))
+
+(module+ test
+  (test (inherits-from 'a 'a (list))
+        #f))

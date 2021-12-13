@@ -6,6 +6,9 @@
 (require "class.rkt")
 
 (define-type ExpI
+  (castI [to : Symbol]
+         [obj : ExpI])
+  
   (numI [n : Number])
   (plusI [lhs : ExpI]
          [rhs : ExpI])
@@ -37,6 +40,8 @@
   (local [(define (recur expr)
             (exp-i->c expr super-name))]
     (type-case ExpI a
+      [(castI to obj) (castE to (recur obj))]
+      
       [(numI n) (numE n)]
       [(plusI l r) (plusE (recur l) (recur r))]
       [(multI l r) (multE (recur l) (recur r))]
@@ -57,6 +62,10 @@
                (recur arg-expr))])))
 
 (module+ test
+  (test (exp-i->c (castI 'Object (thisI)) 'Posn)
+        (castE 'Object (thisE)))
+  
+  
   (test (exp-i->c (numI 10) 'Object)
         (numE 10))
   (test (exp-i->c (plusI (numI 10) (numI 2)) 'Object)
@@ -82,6 +91,7 @@
   (type-case ClassI c
     [(classI super-name field-names methods)
      (classC
+      super-name
       field-names
       (map (lambda (m)
              (values (fst m)
@@ -106,7 +116,8 @@
              (list posn3d-mdist-i-method))))
   (define posn3d-c-class-not-flat
     (values 'Posn3D
-            (classC (list 'z)
+            (classC 'Posn
+                    (list 'z)
                     (list posn3d-mdist-c-method))))
 
   (test (class-i->c-not-flat (snd posn3d-i-class))
@@ -118,10 +129,11 @@
                        [classes-not-flat : (Listof (Symbol * Class))] 
                        [i-classes : (Listof (Symbol * ClassI))]) : Class
   (type-case Class (find classes-not-flat name)
-    [(classC field-names methods)
+    [(classC super-name field-names methods)
      (type-case Class (flatten-super name classes-not-flat i-classes)
-       [(classC super-field-names super-methods)
+       [(classC super-super-name super-field-names super-methods)
         (classC
+         name
          (add-fields super-field-names field-names)
          (add/replace-methods super-methods methods))])]))
 
@@ -131,7 +143,7 @@
   (type-case ClassI (find i-classes name)
     [(classI super-name field-names i-methods)
      (if (equal? super-name 'Object)
-         (classC empty empty)
+         (classC 'Object empty empty)
          (flatten-class super-name
                         classes-not-flat
                         i-classes))]))
@@ -155,14 +167,16 @@
   (define posn-c-class-not-flat
     (values
      'Posn
-    (classC (list 'x 'y)
+    (classC 'Posn
+            (list 'x 'y)
             (list (values 'mdist
                           (plusE (getE (thisE) 'x)
                                  (getE (thisE) 'y)))
                   addDist-c-method))))
   (define posn3d-c-class
     (values 'Posn3D
-            (classC (list 'x 'y 'z)
+            (classC 'Posn3D
+                    (list 'x 'y 'z)
                     (list posn3d-mdist-c-method
                           addDist-c-method))))
 

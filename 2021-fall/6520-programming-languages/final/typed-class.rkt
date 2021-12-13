@@ -118,6 +118,14 @@
                    [else (type-error r "num")])]
                 [else (type-error l "num")]))]
       (type-case ExpI expr
+        [(castI to obj-expr)
+         (type-case Type (recur obj-expr)
+           [(objT class-name)
+            (if (or (equal? to class-name) (is-subclass? class-name to t-classes) (is-subclass? to class-name t-classes))
+                (objT to)
+                (type-error obj-expr (symbol->string to)))]
+           [else (type-error obj-expr "object")])]
+        
         [(numI n) (numT)]
         [(plusI l r) (typecheck-nums l r)]
         [(multI l r) (typecheck-nums l r)]
@@ -267,6 +275,21 @@
   (define new-posn27 (newI 'Posn (list (numI 2) (numI 7))))
   (define new-posn531 (newI 'Posn3D (list (numI 5) (numI 3) (numI 1))))
 
+  (test (typecheck-posn (castI 'Object new-posn27))
+        (objT 'Object))
+  (test (typecheck-posn (castI 'Posn new-posn27))
+        (objT 'Posn))
+  (test (typecheck-posn (castI 'Object new-posn531))
+        (objT 'Object))
+  (test (typecheck-posn (castI 'Object (newI 'Object (list))))
+        (objT 'Object))
+  (test (typecheck-posn (castI 'Posn3D new-posn27))
+        (objT 'Posn3D))
+  (test/exn (typecheck-posn (castI 'Square new-posn27))
+        "no type")
+  (test/exn (typecheck-posn (castI 'Posn3D (numI 1)))
+            "no type")
+  
   (test (typecheck-posn (sendI new-posn27 'mdist (numI 0)))
         (numT))
   (test (typecheck-posn (sendI new-posn531 'mdist (numI 0)))
