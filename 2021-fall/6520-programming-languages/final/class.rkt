@@ -3,6 +3,9 @@
 (define-type Exp
   (castE [to : Symbol]
          [obj : Exp])
+  (if0E [if : Exp]
+        [thn : Exp]
+        [els : Exp])
   
   (numE [n : Number])
   (plusE [lhs : Exp]
@@ -71,6 +74,14 @@
                 (objV class-name field-vals)
                 (error 'interp "cannot cast to that"))]
            [else (error 'interp "not an object")])]
+        [(if0E i t e)
+         (let ([interped-i (recur i)])
+           (type-case Value interped-i
+             [(numV n)
+              (if (equal? 0 n)
+                  (recur t)
+                  (recur e))]
+             [else (error 'interp "not a number")]))]
         
         [(numE n) (numV n)]
         [(plusE l r) (num+ (recur l) (recur r))]
@@ -172,6 +183,24 @@
             "cannot cast to that")
   (test/exn (interp-posn (castE 'Object (numE 2)))
             "not an object")
+  
+  (test (interp-posn (if0E (numE 0)
+                           (numE 2)
+                           (numE 3)))
+        (numV 2))
+  (test (interp-posn (if0E (numE 1)
+                           (numE 2)
+                           (numE 3)))
+        (numV 3))
+  (test (interp-posn (if0E (sendE posn27 'addX (numE -2))
+                           (numE 2)
+                           (numE 3)))
+        (numV 2))
+  (test/exn (interp-posn (if0E (newE 'Posn (list (numE 2) (numE 7)))
+                           (numE 2)
+                           (numE 3)))
+        "not a number")
+
   
   (test (interp (numE 10) 
                 empty (objV 'Object empty) (numV 0))

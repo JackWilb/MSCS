@@ -41,6 +41,10 @@
    [(s-exp-match? `{cast SYMBOL ANY} s)
     (castI (s-exp->symbol (second (s-exp->list s)))
            (parse (third (s-exp->list s))))]
+   [(s-exp-match? `{if0 ANY ANY ANY} s)
+    (if0I (parse (second (s-exp->list s)))
+          (parse (third (s-exp->list s)))
+          (parse (fourth (s-exp->list s))))]
    
    [(s-exp-match? `{+ ANY ANY} s)
     (plusI (parse (second (s-exp->list s)))
@@ -66,6 +70,8 @@
 (module+ test
   (test (parse `{cast Object this})
         (castI 'Object (thisI)))
+  (test (parse `{if0 0 2 3})
+        (if0I (numI 0) (numI 2) (numI 3)))
   
   (test (parse `0)
         (numI 0))

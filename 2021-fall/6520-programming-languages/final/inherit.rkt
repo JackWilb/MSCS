@@ -8,6 +8,9 @@
 (define-type ExpI
   (castI [to : Symbol]
          [obj : ExpI])
+  (if0I [if : ExpI]
+        [thn : ExpI]
+        [els : ExpI])
   
   (numI [n : Number])
   (plusI [lhs : ExpI]
@@ -41,6 +44,7 @@
             (exp-i->c expr super-name))]
     (type-case ExpI a
       [(castI to obj) (castE to (recur obj))]
+      [(if0I i t e) (if0E (recur i) (recur t) (recur e))]
       
       [(numI n) (numE n)]
       [(plusI l r) (plusE (recur l) (recur r))]
@@ -64,7 +68,9 @@
 (module+ test
   (test (exp-i->c (castI 'Object (thisI)) 'Posn)
         (castE 'Object (thisE)))
-  
+  (test (exp-i->c (if0I (numI 0) (numI 2) (numI 3)) 'Object)
+        (if0E (numE 0) (numE 2) (numE 3)))
+
   
   (test (exp-i->c (numI 10) 'Object)
         (numE 10))

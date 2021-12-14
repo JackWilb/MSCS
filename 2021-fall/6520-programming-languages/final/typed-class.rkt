@@ -125,6 +125,11 @@
                 (objT to)
                 (type-error obj-expr (symbol->string to)))]
            [else (type-error obj-expr "object")])]
+        [(if0I i t e)
+         (type-case Type (recur i)
+           [(numT)
+            (lub (recur t) (recur e) t-classes)]
+           [else (type-error i "num")])]
         
         [(numI n) (numT)]
         [(plusI l r) (typecheck-nums l r)]
@@ -169,6 +174,19 @@
                            method-name
                            arg-expr arg-type
                            t-classes))]))))
+
+(define (lub [a : Type] [b : Type] [t-classes : (Listof (Symbol * ClassT))]): Type
+  (if (equal? a b)
+      a
+      (type-case Type a
+        [(objT name1)
+         (type-case Type b 
+           [(objT name2)
+            (if (is-subclass? name1 name2 t-classes)
+                b
+                (lub a (objT (classT-super-name (find t-classes name2))) t-classes))]
+           [else (type-error b "no LUB")])]
+        [else (type-error a "no LUB")])))
 
 (define (typecheck-send [class-name : Symbol]
                         [method-name : Symbol]
@@ -286,9 +304,32 @@
   (test (typecheck-posn (castI 'Posn3D new-posn27))
         (objT 'Posn3D))
   (test/exn (typecheck-posn (castI 'Square new-posn27))
-        "no type")
+            "no type")
   (test/exn (typecheck-posn (castI 'Posn3D (numI 1)))
             "no type")
+  (test (typecheck-posn (if0I (numI 0) (numI 2) (numI 3)))
+        (numT))
+  (test (typecheck-posn (if0I (numI 0) new-posn27 new-posn27))
+        (objT 'Posn))
+  (test (typecheck-posn (if0I (numI 0) new-posn27 new-posn531))
+        (objT 'Posn))
+  (test (typecheck-posn (if0I (numI 0) new-posn531 new-posn27))
+        (objT 'Posn))
+  (test (typecheck-posn (if0I (numI 0) (newI 'Object (list)) new-posn27))
+        (objT 'Object))
+  (test (typecheck-posn (if0I (numI 0) new-posn27 (newI 'Object (list))))
+        (objT 'Object))
+  (test (typecheck-posn (if0I (numI 0) new-posn27 (newI 'Object (list))))
+        (objT 'Object))
+  (test (typecheck-posn (if0I (numI 0) (newI 'Square (list (newI 'Posn (list (numI 0) (numI 1))))) new-posn27))
+        (objT 'Object))
+  (test/exn (typecheck-posn (if0I (numI 0) new-posn27 (numI 3)))
+        "no type")
+  (test/exn (typecheck-posn (if0I (numI 0) (numI 3) new-posn27))
+        "no type")
+  (test/exn (typecheck-posn (if0I new-posn27 (numI 3) (numI 4)))
+        "no type")
+  
   
   (test (typecheck-posn (sendI new-posn27 'mdist (numI 0)))
         (numT))
