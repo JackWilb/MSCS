@@ -6,6 +6,7 @@
   (if0E [if : Exp]
         [thn : Exp]
         [els : Exp])
+  (nullE)
   
   (numE [n : Number])
   (plusE [lhs : Exp]
@@ -34,7 +35,8 @@
 (define-type Value
   (numV [n : Number])
   (objV [class-name : Symbol]
-        [field-values : (Listof Value)]))
+        [field-values : (Listof Value)])
+  (nullV))
 
 (module+ test
   (print-only-errors #t))
@@ -82,6 +84,7 @@
                   (recur t)
                   (recur e))]
              [else (error 'interp "not a number")]))]
+        [(nullE) (nullV)]
         
         [(numE n) (numV n)]
         [(plusE l r) (num+ (recur l) (recur r))]
@@ -103,6 +106,7 @@
                            field-names
                            field-vals)
                      field-name)])]
+           [(nullV) (error 'interp "get on null")]
            [else (error 'interp "not an object")])]
         [(sendE obj-expr method-name arg-expr)
          (local [(define obj (recur obj-expr))
@@ -111,6 +115,7 @@
              [(objV class-name field-vals)
               (call-method class-name method-name classes
                            obj arg-val)]
+             [(nullV) (error 'interp "send on null")]
              [else (error 'interp "not an object")]))]
         [(ssendE obj-expr class-name method-name arg-expr)
          (local [(define obj (recur obj-expr))
@@ -200,6 +205,24 @@
                            (numE 2)
                            (numE 3)))
         "not a number")
+  (test (interp-posn (nullE))
+        (nullV))
+  (test (interp-posn (sendE (ssendE (nullE) 'Posn 'factory12 (numE 0))
+                            'multY
+                            (numE 15)))
+        (numV 30))
+  (test/exn (interp-posn (sendE (ssendE (nullE) 'Posn 'multY (numE 0))
+                                'multY
+                                (numE 15)))
+            "get on null")
+  (test/exn (interp-posn (getE (nullE) 'x))
+            "get on null")
+  (test/exn (interp-posn (sendE (nullE) 'mdist (numE 0)))
+            "send on null")
+  (test/exn (interp-posn (ssendE (nullE) 'Posn 'mdist (numE 0)))
+            "get on null")
+  (test/exn (interp-posn (plusE (numE 1) (nullE)))
+            "not a number")
 
   
   (test (interp (numE 10) 

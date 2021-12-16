@@ -15,7 +15,8 @@
 
 (define-type Type
   (numT)
-  (objT [class-name : Symbol]))
+  (objT [class-name : Symbol])
+  (nullT))
 
 (module+ test
   (print-only-errors #t))
@@ -80,6 +81,10 @@
        [(objT name2)
         (is-subclass? name1 name2 t-classes)]
        [else #f])]
+    [(nullT)
+     (type-case Type t2 
+       [(objT name2) #t]
+       [else (equal? t1 t2)])]
     [else (equal? t1 t2)]))
 
 (module+ test
@@ -102,7 +107,16 @@
   (test (is-subtype? (objT 'A) (objT 'B) (list a-t-class b-t-class))
         #f)
   (test (is-subtype? (objT 'B) (objT 'A) (list a-t-class b-t-class))
-        #t))
+        #t)
+
+  (test (is-subtype? (nullT) (nullT) empty)
+        #t)
+  (test (is-subtype? (nullT) (numT) empty)
+        #f)
+  (test (is-subtype? (nullT) (objT 'Object) empty)
+        #t)
+  (test (is-subtype? (objT 'Posn) (nullT) empty)
+        #f))
 
 ;; ----------------------------------------
 
@@ -130,6 +144,7 @@
            [(numT)
             (lub (recur t) (recur e) t-classes)]
            [else (type-error i "num")])]
+        [(nullI) (nullT)]
         
         [(numI n) (numT)]
         [(plusI l r) (typecheck-nums l r)]
@@ -269,7 +284,10 @@
                           (values 'addDist
                                   (methodT (objT 'Posn) (numT)
                                            (plusI (sendI (thisI) 'mdist (numI 0))
-                                                  (sendI (argI) 'mdist (numI 0)))))))))
+                                                  (sendI (argI) 'mdist (numI 0)))))
+                          (values 'factory12
+                                  (methodT (objT 'Posn) (objT 'Posn)
+                                           (newI 'Posn (list (numI 1) (numI 2)))))))))
 
   (define posn3D-t-class 
     (values 'Posn3D
@@ -324,11 +342,26 @@
   (test (typecheck-posn (if0I (numI 0) (newI 'Square (list (newI 'Posn (list (numI 0) (numI 1))))) new-posn27))
         (objT 'Object))
   (test/exn (typecheck-posn (if0I (numI 0) new-posn27 (numI 3)))
-        "no type")
+            "no type")
   (test/exn (typecheck-posn (if0I (numI 0) (numI 3) new-posn27))
-        "no type")
+            "no type")
   (test/exn (typecheck-posn (if0I new-posn27 (numI 3) (numI 4)))
-        "no type")
+            "no type")
+  (test (typecheck-posn (nullI))
+        (nullT))
+  (test (typecheck-posn (if0I (numI 0) (nullI) (nullI)))
+        (nullT))
+  (test (typecheck-posn (sendI new-posn27 'factory12 (nullI)))
+        (objT 'Posn))
+  (test (typecheck-posn (sendI new-posn27 'factory12 new-posn27))
+        (objT 'Posn))
+  (test (typecheck-posn (newI 'Square (list (nullI))))
+        (objT 'Square))
+  (test/exn (typecheck-posn (sendI (nullI) 'mdist (numI 0)))
+            "no type")
+  (test/exn (typecheck (getI (nullI) 'x)
+                       empty)
+            "no type")
   
   
   (test (typecheck-posn (sendI new-posn27 'mdist (numI 0)))

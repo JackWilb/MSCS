@@ -37,6 +37,7 @@
    [(s-exp-match? `NUMBER s) (numI (s-exp->number s))]
    [(s-exp-match? `arg s) (argI)]
    [(s-exp-match? `this s) (thisI)]
+   [(s-exp-match? `null s) (nullI)]
 
    [(s-exp-match? `{cast SYMBOL ANY} s)
     (castI (s-exp->symbol (second (s-exp->list s)))
@@ -72,6 +73,10 @@
         (castI 'Object (thisI)))
   (test (parse `{if0 0 2 3})
         (if0I (numI 0) (numI 2) (numI 3)))
+  (test (parse `null)
+        (nullI))
+  (test (parse `{+ 1 null})
+        (plusI (numI 1) (nullI)))
   
   (test (parse `0)
         (numI 0))
@@ -123,7 +128,8 @@
                      (map parse-class classes))])
     (type-case Value v
       [(numV n) (number->s-exp n)]
-      [(objV class-name field-vals) `object])))
+      [(objV class-name field-vals) `object]
+      [(nullV) `null])))
 
 (module+ test
   (test (interp-prog
@@ -147,5 +153,12 @@
                             {super mdist arg}}]})
         
         `{send {new Posn3D 5 3 1} addDist {new Posn 2 7}})
-       `18))
+       `18)
+
+  (test (interp-prog
+         (list
+          `{class Empty extends Object
+             {}})
+         `null)
+        `null))
 

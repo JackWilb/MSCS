@@ -11,6 +11,7 @@
   (if0I [if : ExpI]
         [thn : ExpI]
         [els : ExpI])
+  (nullI)
   
   (numI [n : Number])
   (plusI [lhs : ExpI]
@@ -45,6 +46,7 @@
     (type-case ExpI a
       [(castI to obj) (castE to (recur obj))]
       [(if0I i t e) (if0E (recur i) (recur t) (recur e))]
+      [(nullI) (nullE)]
       
       [(numI n) (numE n)]
       [(plusI l r) (plusE (recur l) (recur r))]
@@ -70,6 +72,8 @@
         (castE 'Object (thisE)))
   (test (exp-i->c (if0I (numI 0) (numI 2) (numI 3)) 'Object)
         (if0E (numE 0) (numE 2) (numE 3)))
+  (test (exp-i->c (nullI) 'Object)
+        (nullE))
 
   
   (test (exp-i->c (numI 10) 'Object)
