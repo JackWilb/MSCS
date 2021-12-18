@@ -201,7 +201,7 @@
         [(arrSetI l i v)
          (local [(define arr-type (recur l))
                  (define val-type (recur v))]
-           (if (equal? (arrT-elem arr-type) val-type)
+           (if (is-subtype? val-type (arrT-elem arr-type) t-classes)
                (numT)
                (type-error v (to-string arr-type))))]
         
@@ -436,8 +436,8 @@
         (numT))
   (test/exn (typecheck-posn (arrSetI (newArrI `Posn3D (numI 1) new-posn531) (numI 0) new-posn27))
             "no type")
-  (test/exn (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) new-posn531))
-            "no type")
+  (test (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) new-posn531))
+        (numT))
   (test/exn (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) (numI 0)))
             "no type")
   

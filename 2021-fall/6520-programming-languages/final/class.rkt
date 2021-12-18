@@ -109,9 +109,16 @@
          (local [(define lst (arrV-ent (recur l)))
                  (define ind (numV-n (recur i)))
                  (define val (recur v))]
-           (if (and (< ind (length lst)) (>= ind 0))
+           (if (and
+                (< ind (length lst))
+                (>= ind 0))
                (begin
-                 (update-entry lst ind val 0)
+                 (type-case Value val
+                   [(objV name fields)
+                    (if (inherits-from (objV-class-name (unbox (first lst))) name (reverse classes))
+                                    (update-entry lst ind val 0)
+                                    (error 'interp "does not inherit-from"))]
+                   [else (update-entry lst ind val 0)])
                  (numV 0))
                (error 'interp "index out of bounds")))]
         
@@ -289,6 +296,11 @@
   (test/exn (interp (arrSetE (newArrE (numE 2) (numE 1)) (numE 5) (numE 2))
                     empty (objV 'Object empty) (numV 0))
             "index out of bounds")
+
+  (test/exn (interp-posn (arrSetE (newArrE (numE 1) posn531) (numE 0) posn27))
+            "does not inherit-from")
+  (test (interp-posn (arrSetE (newArrE (numE 1) posn27) (numE 0) posn531))
+        (numV 0))
   
   
 

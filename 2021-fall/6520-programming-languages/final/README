@@ -32,7 +32,7 @@ That said, they types are:
 
 ### Array sub-typing
 
-The changes for this were relatively minor. I just extended the type checker to allow arrT sub-typing as described in the question.
+The changes for this were relatively minor. I just extended the type checker to allow arrT sub-typing as described in the question. I also added a run time check that the type of the class for an object is a subtype of the objects in the list. This should satisfy the second requirement, although the type checker would already catch these issues. For example, the type checker allows putting a Posn3D where a Posn should go, but not the opposite way.
 
 ## Total stars earned (in order of implementation)
 - (#1 1 star) casting
