@@ -82,6 +82,11 @@
        [(objT name2)
         (is-subclass? name1 name2 t-classes)]
        [else #f])]
+    [(arrT it1)
+     (type-case Type t2 
+       [(arrT it2)
+        (is-subtype? it1 it2 t-classes)]
+       [else #f])]
     [(nullT)
      (type-case Type t2 
        [(objT name2) #t]
@@ -117,7 +122,52 @@
   (test (is-subtype? (nullT) (objT 'Object) empty)
         #t)
   (test (is-subtype? (objT 'Posn) (nullT) empty)
+        #f)
+
+  (test (is-subtype? (arrT (objT 'A)) (arrT (objT 'B)) (list a-t-class b-t-class))
+        #f)
+  (test (is-subtype? (arrT (objT 'B)) (arrT (objT 'A)) (list a-t-class b-t-class))
+        #t)
+  (test (is-subtype? (arrT (nullT)) (arrT (objT 'A)) (list a-t-class b-t-class))
+        #t)
+  (test (is-subtype? (arrT (nullT)) (arrT (objT 'B)) (list a-t-class b-t-class))
+        #t)
+  (test (is-subtype? (arrT (objT 'B)) (arrT (nullT)) (list a-t-class b-t-class))
+        #f)
+  (test (is-subtype? (arrT (numT)) (arrT (numT)) empty)
+        #t)
+  (test (is-subtype? (arrT (nullT)) (arrT (numT)) empty)
+        #f)
+  (test (is-subtype? (arrT (nullT)) (numT) empty)
         #f))
+
+;; ----------------------------------------
+
+(define (parse-type [s : S-Exp]) : Type
+  (cond
+    [(s-exp-match? `null s)
+     (nullT)]
+    [(s-exp-match? `{arrayof ANY} s)
+     (arrT (parse-type (second (s-exp->list s))))]
+    [(s-exp-match? `num s)
+     (numT)]
+    [(s-exp-match? `SYMBOL s)
+     (objT (s-exp->symbol s))]
+    [else (error 'parse-type "invalid input")]))
+
+(module+ test
+  (test (parse-type `num)
+        (numT))
+  (test (parse-type `Object)
+        (objT 'Object))
+  (test (parse-type `null)
+        (nullT))
+  (test (parse-type `{arrayof num})
+        (arrT (numT)))
+  (test (parse-type `{arrayof Posn})
+        (arrT (objT 'Posn)))
+  (test/exn (parse-type `{})
+            "invalid input"))
 
 ;; ----------------------------------------
 
@@ -146,13 +196,13 @@
             (lub (recur t) (recur e) t-classes)]
            [else (type-error i "num")])]
         [(nullI) (nullT)]
-        [(newArrI s v) (arrT (recur v))]
+        [(newArrI t s v) (arrT (parse-type t))]
         [(arrRefI l i) (arrT-elem (recur l))]
         [(arrSetI l i v)
          (local [(define arr-type (recur l))
                  (define val-type (recur v))]
            (if (equal? (arrT-elem arr-type) val-type)
-               (nullT)
+               (numT)
                (type-error v (to-string arr-type))))]
         
         [(numI n) (numT)]
@@ -372,23 +422,23 @@
                        empty)
             "no type")
 
-  (test (typecheck (newArrI (numI 1) (numI 0))
+  (test (typecheck (newArrI `num (numI 1) (numI 0))
                    empty)
         (arrT (numT)))
-  (test (typecheck-posn (newArrI  (numI 1) new-posn27))
+  (test (typecheck-posn (newArrI `Posn (numI 1) new-posn27))
         (arrT (objT 'Posn)))
-  (test (typecheck (arrRefI (newArrI (numI 1) (numI 0)) (numI 0))
+  (test (typecheck (arrRefI (newArrI `num (numI 1) (numI 0)) (numI 0))
                    empty)
         (numT))
-  (test (typecheck-posn (arrRefI (newArrI (numI 1) new-posn27) (numI 0)))
+  (test (typecheck-posn (arrRefI (newArrI `Posn (numI 1) new-posn27) (numI 0)))
         (objT 'Posn))
-  (test (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) new-posn27))
-        (nullT))
-  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn531) (numI 0) new-posn27))
+  (test (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) new-posn27))
+        (numT))
+  (test/exn (typecheck-posn (arrSetI (newArrI `Posn3D (numI 1) new-posn531) (numI 0) new-posn27))
             "no type")
-  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) new-posn531))
+  (test/exn (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) new-posn531))
             "no type")
-  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) (numI 0)))
+  (test/exn (typecheck-posn (arrSetI (newArrI `Posn (numI 1) new-posn27) (numI 0) (numI 0)))
             "no type")
   
   

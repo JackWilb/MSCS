@@ -40,31 +40,7 @@
                (parse (fourth (rest (s-exp->list s))))))]
     [else (error 'parse-t-method "invalid input")]))
 
-(define (parse-type [s : S-Exp]) : Type
-  (cond
-    [(s-exp-match? `null s)
-     (nullT)]
-    [(s-exp-match? `{arrayof ANY} s)
-     (arrT (parse-type (second (s-exp->list s))))]
-    [(s-exp-match? `num s)
-     (numT)]
-    [(s-exp-match? `SYMBOL s)
-     (objT (s-exp->symbol s))]
-    [else (error 'parse-type "invalid input")]))
-
 (module+ test
-  (test (parse-type `num)
-        (numT))
-  (test (parse-type `Object)
-        (objT 'Object))
-  (test (parse-type `null)
-        (nullT))
-  (test (parse-type `{arrayof num})
-        (arrT (numT)))
-  (test (parse-type `{arrayof Posn})
-        (arrT (objT 'Posn)))
-  (test/exn (parse-type `{})
-            "invalid input")
   
   (test (parse-t-field `[x : num])
         (values 'x (numT)))

@@ -12,7 +12,8 @@
         [thn : ExpI]
         [els : ExpI])
   (nullI)
-  (newArrI [size : ExpI]
+  (newArrI [type : S-Exp]
+           [size : ExpI]
            [init : ExpI])
   (arrRefI [arr : ExpI]
            [index : ExpI])
@@ -54,7 +55,7 @@
       [(castI to obj) (castE to (recur obj))]
       [(if0I i t e) (if0E (recur i) (recur t) (recur e))]
       [(nullI) (nullE)]
-      [(newArrI s v) (newArrE (recur s) (recur v))]
+      [(newArrI t s v) (newArrE (recur s) (recur v))]
       [(arrRefI l i) (arrRefE (recur l) (recur i))]
       [(arrSetI l i v) (arrSetE (recur l) (recur i) (recur v))]
       
@@ -84,11 +85,11 @@
         (if0E (numE 0) (numE 2) (numE 3)))
   (test (exp-i->c (nullI) 'Object)
         (nullE))
-  (test (exp-i->c (newArrI (numI 5) (numI 0)) 'Object)
+  (test (exp-i->c (newArrI `num (numI 5) (numI 0)) 'Object)
         (newArrE (numE 5) (numE 0)))
-  (test (exp-i->c (arrRefI (newArrI (numI 5) (numI 0)) (numI 1)) 'Object)
+  (test (exp-i->c (arrRefI (newArrI `num (numI 5) (numI 0)) (numI 1)) 'Object)
         (arrRefE (newArrE (numE 5) (numE 0)) (numE 1)))
-  (test (exp-i->c (arrSetI (newArrI (numI 5) (numI 0)) (numI 0) (numI 5)) 'Object)
+  (test (exp-i->c (arrSetI (newArrI `num (numI 5) (numI 0)) (numI 0) (numI 5)) 'Object)
         (arrSetE (newArrE (numE 5) (numE 0)) (numE 0) (numE 5)))
 
   

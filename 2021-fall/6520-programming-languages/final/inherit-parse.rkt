@@ -38,8 +38,9 @@
    [(s-exp-match? `arg s) (argI)]
    [(s-exp-match? `this s) (thisI)]
    [(s-exp-match? `null s) (nullI)]
-   [(s-exp-match? `{newarray SYMBOL ANY ANY} s)
-    (newArrI (parse (third (s-exp->list s)))
+   [(s-exp-match? `{newarray ANY ANY ANY} s)
+    (newArrI (second (s-exp->list s))
+             (parse (third (s-exp->list s)))
              (parse (fourth (s-exp->list s))))]
    [(s-exp-match? `{arrayref ANY ANY} s)
     (arrRefI (parse (second (s-exp->list s)))
@@ -88,11 +89,11 @@
   (test (parse `{+ 1 null})
         (plusI (numI 1) (nullI)))
   (test (parse `{newarray num 5 0})
-        (newArrI (numI 5) (numI 0)))
+        (newArrI `num (numI 5) (numI 0)))
   (test (parse `{arrayref {newarray num 5 0} 1})
-        (arrRefI (newArrI (numI 5) (numI 0)) (numI 1)))
+        (arrRefI (newArrI `num (numI 5) (numI 0)) (numI 1)))
   (test (parse `{arrayset {newarray num 5 0} 0 5})
-        (arrSetI (newArrI (numI 5) (numI 0)) (numI 0) (numI 5)))
+        (arrSetI (newArrI `num (numI 5) (numI 0)) (numI 0) (numI 5)))
   
   (test (parse `0)
         (numI 0))
