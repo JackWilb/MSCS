@@ -7,6 +7,13 @@
         [thn : Exp]
         [els : Exp])
   (nullE)
+  (newArrE [size : Exp]
+           [init : Exp])
+  (arrRefE [arr : Exp]
+           [index : Exp])
+  (arrSetE [arr : Exp]
+           [index : Exp]
+           [val : Exp])
   
   (numE [n : Number])
   (plusE [lhs : Exp]
@@ -36,7 +43,8 @@
   (numV [n : Number])
   (objV [class-name : Symbol]
         [field-values : (Listof Value)])
-  (nullV))
+  (nullV)
+  (arrV [ent : (Listof (Boxof Value))]))
 
 (module+ test
   (print-only-errors #t))
@@ -85,6 +93,27 @@
                   (recur e))]
              [else (error 'interp "not a number")]))]
         [(nullE) (nullV)]
+        [(newArrE s v)
+         (local [(define size (numV-n (recur s)))
+                 (define val (recur v))]
+           (if (>= size 0)
+               (arrV (gen-list size val))
+               (error 'interp "negative size")))]
+        [(arrRefE l i)
+         (local [(define lst (arrV-ent (recur l)))
+                 (define ind (numV-n (recur i)))]
+         (if (and (< ind (length lst)) (>= ind 0))
+             (unbox (list-ref lst ind))
+             (error 'interp "index out of bounds")))]
+        [(arrSetE l i v)
+         (local [(define lst (arrV-ent (recur l)))
+                 (define ind (numV-n (recur i)))
+                 (define val (recur v))]
+           (if (and (< ind (length lst)) (>= ind 0))
+               (begin
+                 (update-entry lst ind val 0)
+                 (numV 0))
+               (error 'interp "index out of bounds")))]
         
         [(numE n) (numV n)]
         [(plusE l r) (num+ (recur l) (recur r))]
@@ -145,6 +174,16 @@
 (define (num+ x y) (num-op + '+ x y))
 (define (num* x y) (num-op * '* x y))
 
+(define (gen-list [size : Number] [val : Value])
+  (if (equal? size 0)
+      empty
+      (cons (box val) (gen-list (- size 1) val))))
+
+(define (update-entry [lst : (Listof (Boxof Value))] [ind : Number] [val : Value] [cur-pos : Number])
+  (if (equal? cur-pos ind)
+      (set-box! (first lst) val)
+      (update-entry (rest lst) ind val (+ 1 cur-pos))))
+
 ;; ----------------------------------------
 ;; Examples
 
@@ -188,7 +227,6 @@
             "cannot cast to that")
   (test/exn (interp-posn (castE 'Object (numE 2)))
             "not an object")
-  
   (test (interp-posn (if0E (numE 0)
                            (numE 2)
                            (numE 3)))
@@ -223,6 +261,36 @@
             "get on null")
   (test/exn (interp-posn (plusE (numE 1) (nullE)))
             "not a number")
+  (test (interp (newArrE (numE 3) (numE 0))
+                empty (objV 'Object empty) (numV 0))
+        (arrV (list (box (numV 0)) (box (numV 0)) (box (numV 0)))))
+  (test (interp-posn (newArrE (numE 3) posn27))
+        (arrV (list (box (objV 'Posn (list (numV 2) (numV 7)))) (box (objV 'Posn (list (numV 2) (numV 7)))) (box (objV 'Posn (list (numV 2) (numV 7)))))))
+  (test (interp (arrRefE (newArrE (numE 5) (numE 0)) (numE 1))
+                empty (objV 'Object empty) (numV 0))
+        (numV 0))
+  (define arr-arg (interp (newArrE (numE 2) (numE 1))
+                          empty (objV 'Object empty) (numV 0)))
+
+  (interp (arrSetE (argE) (numE 1) (numE 2)) ;; update the array with set (imperative)
+          empty (objV 'Object empty) arr-arg)
+  (test (interp (arrRefE (argE) (numE 0))
+                empty (objV 'Object empty) arr-arg)
+        (numV 1))
+  (test (interp (arrRefE (argE) (numE 1))
+                empty (objV 'Object empty) arr-arg)
+        (numV 2))
+  (test/exn (interp (newArrE (numE -2) (numE 1))
+                    empty (objV 'Object empty) (numV 0))
+            "negative size")
+  (test/exn (interp (arrRefE (argE) (numE -1))
+                    empty (objV 'Object empty) arr-arg)
+            "index out of bounds")
+  (test/exn (interp (arrSetE (newArrE (numE 2) (numE 1)) (numE 5) (numE 2))
+                    empty (objV 'Object empty) (numV 0))
+            "index out of bounds")
+  
+  
 
   
   (test (interp (numE 10) 

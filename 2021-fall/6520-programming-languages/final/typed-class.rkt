@@ -16,7 +16,8 @@
 (define-type Type
   (numT)
   (objT [class-name : Symbol])
-  (nullT))
+  (nullT)
+  (arrT [elem : Type]))
 
 (module+ test
   (print-only-errors #t))
@@ -145,6 +146,14 @@
             (lub (recur t) (recur e) t-classes)]
            [else (type-error i "num")])]
         [(nullI) (nullT)]
+        [(newArrI s v) (arrT (recur v))]
+        [(arrRefI l i) (arrT-elem (recur l))]
+        [(arrSetI l i v)
+         (local [(define arr-type (recur l))
+                 (define val-type (recur v))]
+           (if (equal? (arrT-elem arr-type) val-type)
+               (nullT)
+               (type-error v (to-string arr-type))))]
         
         [(numI n) (numT)]
         [(plusI l r) (typecheck-nums l r)]
@@ -362,6 +371,26 @@
   (test/exn (typecheck (getI (nullI) 'x)
                        empty)
             "no type")
+
+  (test (typecheck (newArrI (numI 1) (numI 0))
+                   empty)
+        (arrT (numT)))
+  (test (typecheck-posn (newArrI  (numI 1) new-posn27))
+        (arrT (objT 'Posn)))
+  (test (typecheck (arrRefI (newArrI (numI 1) (numI 0)) (numI 0))
+                   empty)
+        (numT))
+  (test (typecheck-posn (arrRefI (newArrI (numI 1) new-posn27) (numI 0)))
+        (objT 'Posn))
+  (test (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) new-posn27))
+        (nullT))
+  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn531) (numI 0) new-posn27))
+            "no type")
+  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) new-posn531))
+            "no type")
+  (test/exn (typecheck-posn (arrSetI (newArrI  (numI 1) new-posn27) (numI 0) (numI 0)))
+            "no type")
+  
   
   
   (test (typecheck-posn (sendI new-posn27 'mdist (numI 0)))

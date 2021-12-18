@@ -42,6 +42,10 @@
 
 (define (parse-type [s : S-Exp]) : Type
   (cond
+    [(s-exp-match? `null s)
+     (nullT)]
+    [(s-exp-match? `{arrayof ANY} s)
+     (arrT (parse-type (second (s-exp->list s))))]
     [(s-exp-match? `num s)
      (numT)]
     [(s-exp-match? `SYMBOL s)
@@ -53,6 +57,12 @@
         (numT))
   (test (parse-type `Object)
         (objT 'Object))
+  (test (parse-type `null)
+        (nullT))
+  (test (parse-type `{arrayof num})
+        (arrT (numT)))
+  (test (parse-type `{arrayof Posn})
+        (arrT (objT 'Posn)))
   (test/exn (parse-type `{})
             "invalid input")
   
@@ -87,7 +97,8 @@
     (type-case Value v
       [(numV n) (number->s-exp n)]
       [(objV class-name field-vals) `object]
-      [(nullV) `null])))
+      [(nullV) `null]
+      [(arrV e) `array])))
 
 (module+ test
   (test (interp-t-prog
@@ -122,4 +133,11 @@
           `{class Empty extends Object
              {}})
          `null)
-        `null))
+        `null)
+
+  (test (interp-t-prog
+         (list
+          `{class Empty extends Object
+             {}})
+         `{newarray num 2 0})
+        `array))

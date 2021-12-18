@@ -18,9 +18,22 @@ I added a nullE and a nullV, and interpreting a nullE makes a nullV. I didn't up
 
 For type checking, it was slightly more complicated. I added a nullT type and made nullT a subtype of objT (while making sure objT was not a subtype of nullT). This allows using null as an argument where an object is expected. For testing, I added the 'factory12 method from the class layer to the typed-class layer and made sure that it allowed nullT and objT as argument values. I also made sure I could pass in a null where the objT was expected in the square class.
 
-## Total stars earned
-- (#1 1 star) Casting
-- (#2 2 star) if0
-- (#8 2 star) null
+### Java-style arrays
 
-Total 5 stars
+To implement the list in an imperative style, I made a new Value, arrV, which has one property, a Listof Boxof Value. Having each entry be a box means that I can update the value inside the box without needing to copy the array each time, thus it should be imperative. The tests I wrote make an argument that is reused after calling set, and the updated values are where they should be. I use this in arrayset along with a set-box! to update the value. To make this compatible with the other methods and helpers, I use box and unbox. Speaking of the other methods, newarray and arrayref, I used helpers called gen-list and update-entry to implement them. The gen-list helper just does adds on a box with the initial value as many times as requested and the update-entry finds the right box and updates it. I added guards for making sure the index is in the range of the array for all the methods. The changes to the inheritance layers were straightforward. I do throw out the type information for interpreting, since it's not used.
+
+You can specify types with {arrayof TYPE} in the typed-parse file, but the type is not saved elsewhere. This might not be quite how you'd imagined I'd implement this, so I'm not sure if it's "right", but it does seem to work. I couldn't think of a way to parse the type that's passed in without creating a circular import where the inherit parse would then require all the type information for it to be passed all the way down to the class layer. Instead, the type of the array is determined by the initial element that is passed in and then we check against the types in the array first, before allowing an arrayset.
+
+That said, they types are:
+
+- (arrT TYPE) where type is another type for newarray
+- TYPE for arrayref
+- null for arrayset
+
+## Total stars earned (in order of implementation)
+- (#1 1 star) casting
+- (#2 2 stars) if0
+- (#8 2 stars) null
+- (#6 3 stars) java-style arrays
+
+Total 8 stars

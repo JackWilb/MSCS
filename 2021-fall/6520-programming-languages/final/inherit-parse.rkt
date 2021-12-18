@@ -38,6 +38,16 @@
    [(s-exp-match? `arg s) (argI)]
    [(s-exp-match? `this s) (thisI)]
    [(s-exp-match? `null s) (nullI)]
+   [(s-exp-match? `{newarray SYMBOL ANY ANY} s)
+    (newArrI (parse (third (s-exp->list s)))
+             (parse (fourth (s-exp->list s))))]
+   [(s-exp-match? `{arrayref ANY ANY} s)
+    (arrRefI (parse (second (s-exp->list s)))
+             (parse (third (s-exp->list s))))]
+   [(s-exp-match? `{arrayset ANY ANY ANY} s)
+    (arrSetI (parse (second (s-exp->list s)))
+             (parse (third (s-exp->list s)))
+             (parse (fourth (s-exp->list s))))]
 
    [(s-exp-match? `{cast SYMBOL ANY} s)
     (castI (s-exp->symbol (second (s-exp->list s)))
@@ -77,6 +87,12 @@
         (nullI))
   (test (parse `{+ 1 null})
         (plusI (numI 1) (nullI)))
+  (test (parse `{newarray num 5 0})
+        (newArrI (numI 5) (numI 0)))
+  (test (parse `{arrayref {newarray num 5 0} 1})
+        (arrRefI (newArrI (numI 5) (numI 0)) (numI 1)))
+  (test (parse `{arrayset {newarray num 5 0} 0 5})
+        (arrSetI (newArrI (numI 5) (numI 0)) (numI 0) (numI 5)))
   
   (test (parse `0)
         (numI 0))
@@ -129,7 +145,8 @@
     (type-case Value v
       [(numV n) (number->s-exp n)]
       [(objV class-name field-vals) `object]
-      [(nullV) `null])))
+      [(nullV) `null]
+      [(arrV lst) `array])))
 
 (module+ test
   (test (interp-prog
@@ -160,5 +177,12 @@
           `{class Empty extends Object
              {}})
          `null)
-        `null))
+        `null)
+
+  (test (interp-prog
+         (list
+          `{class Empty extends Object
+             {}})
+         `{newarray num 2 0})
+        `array))
 
