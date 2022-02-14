@@ -1,0 +1,95 @@
+Jack Wilburn
+Homework 2
+
+Q1a: Give two examples where even the use of strong encryption algorithms can result in significant vulnerabilities?
+
+The weakest link of encryption is often the human that's in the loop. The user may leave encryption keys unsecured or passwords in plaintext, and in both of these cases the use of strong encryption algorithms still results in significant vulnerabilities. If a bad actor is able to access those keys, they can decrypt data and potentially log in to devices that were meant to be secure.
+
+Another possible issue with encrypted data is that as computation power grows, our previously encrypted data is less secure over time. This is especially pronounced with the invention of quantum computers and this could lead to the brute forcing time being severely reduced.
+
+
+Q1b: A one-time pad must never repeat. Yet, in a series of fixed-length numbers, for example 8-bit bytes in RC4, some number must ultimately  repeat,  because  there  are  only  256  8-bit  numbers  (0-255). Why are these two statements not contradictory? 
+
+The keys that are used are at least the length of the message meaning that the key isn't repeated, even though the numbers in the key may be repeated.
+
+Q1c: Suppose  a  router  between  Alice and  Bob  can  intercept  Alice’s  messages  sent  to  Bob  and  insert  its  own messages. Which one of the encryption methods, a block cipher (e.g., AES) or a  stream  cipher  (e.g.,  RC4),  should  Alice  use  if  she  suspects  the  adversarial router  to  know  the  plaintext  corresponding  to  some  of  the  ciphertext  she sends to Bob? Explain your answer.
+
+If Alice suspects that the adverserial router to know some of the plaintext corresponding to the cypher text she is sending, Alice should prefer to send data that is block encoded. The chance that the router knows a whole block is smaller than the chance that they know some letters, so it should be safer. Additionally, the key will be harder to figure out from the block than it would be from a stream cipher, because the block hides the relationship between the ciphertext and the plaintext better. It's possible to decode the key bytes from the cypher bite in a stream cipher.
+
+
+Q2a: With regular CBC, if one ciphertext block is lost, how many plaintext blocks are lost?
+
+2. You lose the message encoded in that block and the input to the next block.
+
+
+Q2b: With NCBC, why do things get back in sync if cn and cn+1 are switched?
+
+The data isn't lost or corrupted for the blocks following the permuted blocks, because the xor operations are commutitive and associative. This mathematical property means that even though the 2 permuted blocks are lost, the rest of the message is sound.
+
+
+Q2c: How about if a ciphertext block is lost?
+
+You lose the entire rest of the blocks after the lost one. If one block is missing, its plaintext value cannot be passed on to help with the decryption of futher blocks.
+
+
+Q2d: How about if ciphertext block n is switched with ciphertext block n+2?
+
+This permutation would only affect the blocks permuted and all blocks in between. The n, n+1, and n+2 blocks would be lost, but the remaining blocks would decode correctly. This is because xor is commutitive and associative. 
+
+
+Q2e: How about any permutation of the first n blocks?
+
+Only the blocks that are permuted and all the ones in between would be lost. Again, this is because xor is associative and commutitive. 
+
+
+Q3a: Assume a good 256-bit message digest function. Assume there is a particular value, d, for the message digest and you would like to find a message that has a message digest of d. Given that there are many more 2000-bit messages that map to a particular 256-bit message digest than 1000-bit messages, would you theoretically have to test fewer 2000-bit messages to find one that has a message digest of d than if you were to test 1000-bit messages? Explain briefly
+
+I expect the opposite is true. If you're looking for a specific message that maps to a 256 bit digest, using 2000 bits means you're more likely to have a collision. Given the number of possible outcomes, the chances of those collisions being incorrect and not matching the desired digest are higher than matching the digest. You'll be wasting time finding incorrect collisions.
+
+
+Q3a: Find the approximate number of messages (n) that need to be tried before finding two that had the same message digest (size k) with probability 0.8. You need to find n as a function of k. What is n when k = 2^256?
+
+This is the birthday paradox. Using your formula from the class notes, the probability is: 1 - n(n-1)/2K  = 0.8. Solving for n when k is 2^256 yields n = 215213465412660609025272909597933305856.
+
+
+Q4a: Turn in your code as well as the encrypted output
+
+Turned in via handin.
+
+Encrypted output: 106,220,204,5,218,205,113,60,81,121,168,238,151,218,177,240,51,203,16
+or 6a,dc,cc,5,da,cd,71,3c,51,79,a8,ee,97,da,b1,f0,33,cb,10
+
+Q4b: The output file must also be submitted with the code
+
+Turned in via handin.
+
+
+Q5a: Let us plot the observed clock offset, in microseconds, on the y-axis and the time since the start of the fingerprinting measurements, in seconds, at the fingerprinter, on the x-axis. Let (6, 60) and (8, 85) be two points at times 6s and 7.5s, where the clock offset is observed by the fingerprinter to be 60 and 85, respectively. Estimate the clock skew of the fingerprintee from these two points. You can assume that the network delays are negligible.
+
+Assuming the transmission times are the same for each of the frames, it's likely that the clock skew of the fingerprintee had experienced a 15 microsecond change. For example, that could be a change in clock skew from 20 to 35 microseconds.
+
+Q5b: Why is it not easy to fabricate clock skews of access points?
+
+There are 2 main reasons why it's not easy to fabricate clock skews of access points:
+
+The first is that if the attacker is trying to broadcast fraudulent frames, the airways may be congested. Since the attacker has manually altered the packets, instead of sending the official time, the skew could be large by the time they are sent. This is because of the wait to send and clear to send signal. This delay to send is somewhat random and makes it hard to perfectly engineer the right packets everytime.
+
+The second is that if the attacker is broadcasting at the same time as the legitimate AP, the frames will likely arrive together and block some of the packets from being accepted. This will manifest as a large difference in skew for the legitimate IP and the client would reject the packets.
+
+
+Q5c: Could ambient conditions change the clock skew-based fingerprints? Explain briefly. Describe one approach to deal with changes in ambient temperature.
+
+In thoery yes, but if we look only on small time horizons, the clock skew is unlikely to change substantially. The authors suggest that once the skew be updated frequently so as to not allow the skew to wander too far before falsely reporting that that the AP is fake. However, this still allows the client to identify a fake AP that transmits with a very different clock skew.
+
+
+Q5d: Suppose that a manufacturing plant of linksys access points can produce 106 unique clock skew fingerprints. How many access points manufactured at this plant do you need to examine to find two that have the same fingerprint with a very high probability? After knowing this number, would you feel confident using the fingerprint method to detect unauthorized access points? Explain briefly.
+
+This question is an instance of the birthday paradox. We need to find n in (106!)/(106^n(106-n)!) = 0.5. Solving this shows we would only need 13 routers to expect a collision in clock skews >50% of the time.
+
+
+Q5e: Would you expect the clock skew of an access point measured by one laptop to be the same as that measured by another laptop? Explain briefly.
+
+Given that the transmissions of the signals from the APs will take different times to arrive at the given laptops, we'd expect that the clock skew would be different for the machines. The transmissions will have transmission and processing times, which will vary across the devices. The differences would be more pronounced if the signals have to travel further.
+
+
+

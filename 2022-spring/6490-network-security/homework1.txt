@@ -1,0 +1,30 @@
+Jack Wilburn
+
+Q1a Importance:
+This paper confronts the scale of the scam business market and describes several possible vectors for reducing the traffic from these scam vendors. The authors cover the entire gamut of technical services used by scammers and consider all of the ways that they could be forced off of these platforms. They end with a speculation about how much time/effort/money it would require to implement a change at any level to make scamming unprofitable. 
+
+While it's important for clarity that the authors discussed every possible vector for reducing spam from these vendors, I would have rather that the authors would have given more technical details for how these kinds of vectors might be implemented. They, essentially, only cover policy changes that could affect the number of spam services, but there are certainly other ways that the changes could be instituted. These could include changes how DNS works, deep packet scanning to prevent the traffic, finding and fixing compromised systems, etc.
+
+Q1b Contribution:
+The main contribution of this paper is a description of potential ways that we might remove spam from our world by focusing our limited attention away from email delivery. Instead of trying to stop delivering spam, the article advocates for trying to de-platform the potential spammers by removing their ability to get domain names, hosting, and payment. Not knowing the field too well, I presume this added significant technical depth the understanding of the spam advertising business and a creative solution, while not providing too much that's novel.
+
+Q1c Strengths:
+The paper spends ample time describing all of the methods used by scammers to redirect people to payment sites. It gives a holistic analysis of the entire spam pipeline from bot-farms sending out URLs or emails all the way to payment and fulfillment. The authors have clearly identified that working with banks is the fastest and easiest way to reduce these monetized spam advertising operations from the potential vectors that they identified.
+
+Q1d Weaknesses:
+This paper relies on a centralized internet that is fundamentally at odds with the current implementation of our global communication. The initial vision for the internet was to create a free an open place for all, but by putting limitations on who can and who cannot access certain parts of the internet, we're stripping away the freedom that the internet provides. This is especially true with the new visions for a decentralized web 3.0, where this kind of centralized blocking of individuals would be far harder. I also think that they could have explored other vectors that may have had a cheaper and easier implementation.
+
+Q1e Summary and comments:
+The perspective that the authors give from this article seemed to be quite a radical one that takes a step back from the technology of blocking spam email to instead consider the other factors that lead to spamming. The main of these being that spamming is profitable -- the law of averages means that if you send enough spam into the world, a small percentage of people will click it and you'll make money.
+
+By consider all the potential points that we may stop the profits, namely naming, hosting, and payment and fulfillment, the authors give a well rounded view of the way we can stop spam. They consider logical next steps for stopping spam, but don't seem to come up with outside-the-box suggestions. Maybe the solution to spam is something well outside of the norm, maybe a mail solution where you have to ask for mail to be delivered from certain mailboxes, etc.
+
+Ultimately, I was impressed that the authors gathered so many URLs in such a short time, almost a billion in 3 months. I also thought that the methods for analyzing such a large sample were interesting, such as using the automated crawlers and clustering the results. I'm also shocked that all that email only represented about 75 affiliate groups, the ones that are clearly the big dogs in the spam industry.
+
+Q2 3 distinct stages:
+The three distinct stages of the spam value chain are:
+1. Naming
+2. Hosting
+3. Payment and fulfillment
+
+The most valuable asset in the spam ecosystem that can be controlled to deal with spam are payment processors. They note in the article "95% of spam-advertised pharmaceutical, replica and software products are monetized using merchant services from just a handful of banks", so if we can influence these banks we can potentially remove some of the value from the spam emails.
