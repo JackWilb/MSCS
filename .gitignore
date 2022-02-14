@@ -2,3 +2,17 @@
 *.rkt~
 *.zip
 
+#6110
+*.trail
+Book1_Computation_Engineering_For_CS6100_Spring2021.pdf 
+Book5_2007_Book_TheCalculusOfComputation.pdf
+Computation_Engineering_For_CS6100_Spring2021.pdf
+.ipynb_checkpoints
+
+*.t
+**/**/*pan*
+**/**/*a.out*
+*.tmp
+
+#6490
+Network security private communication in a public world by Kaufman, CharliePerlman, RadiaSpeciner, Mike (z-lib.org).pdf
