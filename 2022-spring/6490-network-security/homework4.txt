@@ -1,0 +1,115 @@
+Jack Wilburn
+Homework 4
+
+Q1a: Is this an example of an authentication scheme that isn't based on public key cryptography and yet guards against both eavesdropping and server database disclosure?
+
+Yes, this is an example of an authentication scheme that isn't based on public key crypto, while safeguarding against eavesdropping and server database disclosure. By Bob sending a random R, there's no opportunity for replaying a hash to gain access, and Bob doesn't need to know a public/private key pair to calculate whether Alice has passed the right password. He can instead compare the hash with what he expects the hash to be from the password he knows. It's similar to public key crypto, but slightly different because it's not a key pair that's shared, it's just checking a hash for a matching value.
+
+Q1b: Let a dictionary have 4096 words. Let a user pick 5 words at random for choosing a password (i.e., the password comprises of these 5 words). What is the strength of this password in bits? [Hint: Recall the discussion we had on an xkcd comic in the class.] Explain your answer.
+
+Since there are 4096 words, we can represent each word uniquely with 12 bits. Since we have 5 words, and each word contributes 12 bit, there are 5 * 12 = 60 bits of strength in the password.
+
+Q2a: In §11.2 Mutual Authentication, we discuss the reflection attack and note that Protocol 11-8 is susceptible, but Protocol 11-7 is not. How about Protocol 11-11?
+
+In Protocol 11-11, the first person to send a hashed value is Alice, therefore this protocol is not susceptible to a reflection attack. 11-8 is susceptible, because it sends a hashed value in response to a random number, but in 11-11 a hashed value must be sent first for the server to then hash another value.
+
+If the attacker could make the hashed value, there would be no need for the reflection attack. Assuming that they can't, they can't request a hashed value from the server without a hashed value already. Thus, they won't ever receive what they need to progress from Bob.
+
+Q2b: In §11.3.1 Shared Secret we discuss various possibilities for forming a session key. Remember that R is the challenge sent by Bob to Alice, and A is Alice's secret, which Bob also knows. Which of the following are secure for a session key?
+
+A xor R - No. Anyone eavesdropping R can immediately get A by just xoring R with A xor R.
+{R+A}A - Yes, this is fine.
+{A}A - Seems fine, but there's no randomness here so it's not viable as a session key. It's another shared secret key, but wouldn't update with a new session. It doesn't change with session so someone else could impersonate either Alice or Bob.
+{R}R+A - Yes, this is fine.
+
+Q2c: Consider the one-way authentication protocol shown in the figure below. Here, Bob is a stateless server, and therefore it is inconvenient to require him to remember the challenge he sent to Alice. Let K AB be the secret key shared between Alice and Bob. Now, this protocol is vulnerable to a replay attack where an eavesdropper can record R, K AB {R} pair and replay that later. If we enhance the protocol such that R represents the current time, is the protocol secure? Identify one strength, and one weakness of this enhanced protocol.
+
+The enhanced protocol is certainly more effective at reducing the possibility of a replay attack. The replay must be sent at the exact same time as the original request, thus reducing the size of the vulnerability. However, in order for this to work in the real world, there would need to be some slack built into the protocol to allow for transmission delays and computing Kab{R}. This slack gives an attacker a window to replay the transmission and authenticate. Since the server is stateless, it will assume the replayer is Alice, even if Alice is already authenticated.
+
+The strength is that the it reduces the window (a replay couldn't be attempted days later), but a weakness is that if the replay comes soon enough it would authenticate the attacker.
+
+Q2d: In the discussion of Protocol 11-3 on page 261, Bob remembers all the timestamps he's seen within the last 10 minutes. Why is it sufficient for him to remember only 10 minutes worth of timestamps?
+
+It's suitable for him to remember only 10 minutes worth of timestamps because the clock skew is 10 minutes. Remembering 10 timestamps and computing 10 timestamps into the future will give every possible timestamp that Alice could send.
+
+Q2e: Design a two-message authentication protocol, assuming that Alice and Bob know each other's public keys, which accomplishes both mutual authentication and establishment of a session key.
+
+Alice picks a random session key, R. She sends the the key encrypted with both her private key and Bob's public key. Only Bob can decrypt the message encrypted with his public key and can verify that Alice sent the message by using her public key to decrypt the value R.
+
+Bob does the same in the opposite direction. He uses his private key and Alice's public key. This means that Alice is the only one that can decrypt the message and can verify Bob send the message by using his public key to decrypt the value R again.
+
+Once these messages are sent, it's possible for the two to use R (since it was never sent in plain text) to encrypt their session. See the diagram below.
+
+Alice                    Bob
+
+        Kb+{Ka-{R}}
+--------------------------->
+
+        Ka+{Kb-{R}}
+<---------------------------
+
+Q2f: With the help of figures and message exchanges, show the reflection
+attack on the following protocol
+
+Reflection attack:
+Trudy                    Bob
+
+First connection
+      I'm Alice, R2
+--------------------------->
+
+  R1, Kab {SHA1(R2, Kab )}
+<---------------------------
+
+
+Second connection
+      I'm Alice, R1
+--------------------------->
+
+  R3, Kab {SHA1(R1, Kab )}
+<---------------------------
+
+
+First connection again
+    Kab {SHA1(R1, Kab )}
+--------------------------->
+
+Modification to remove offline dictionary attack:
+To make it infeasible to complete a dictionary attack, we can send along a timestamp with the SHA1 message. Then the attacker would need to defeat the hashed value very quickly. You could also use some methods from public key encryption, instead of using a secret key Kab.
+
+Q3a: Suppose we are using Lamport's hash, and Bob crashes before receiving Alice's reply. Suppose an intruder, Trudy, can eavesdrop and detect that Bob crashed (maybe Trudy can even cause Bob to crash). Then Trudy has a quantity (whatever Alice replied that Bob did not receive) which Trudy can use to impersonate Alice, if Trudy logs in before Alice attempts to log into Bob again. How can we modify Bob's behavior to prevent this threat? (Exactly when do we overwrite Bob's database, and with what)?
+
+We need to make sure that the same authentication credentials can't be used again once Bob restarts. As Bob comes back online from a crash, he must decrement n by 1. At this point it seems like we have options. We can ask the user registration software for the password hashed n (1 less than he has stored) times if it still has it, or we can plan that we will have Bob hash the incoming request from Alice 2 times before looking for a match. The second is probably the simpler version and will only require a small change to Bob's code to check n+2, n+3, etc. as and when he crashes. Once the authentication is successful, they may go back to using n-1 again.
+
+Q3b: Consider Protocol 12-8. How would Alice compute K? How would Bob compute K. Why is it insecure? (Hint: someone impersonating Bob can do a dictionary attack, but show how.) 
+
+Let's start with what each person has as the come to compute K. Alice has a, W, g^a modp, g^b modp, and c1. Bob has g^a modp, g^W modp, b, and c1.
+
+Alice computes K as hash( (g^b modp)^a, (g^b modp)^W )
+Bob computes K as hash( (g^a modp)^b, (g^W modp)^b )
+
+Any person impersonating Bob, would have almost the same information as Bob, except they wouldn't be able to compute g^W modp. Given that, the dictionary attack is simply to brute that value, once K{c1} comes back from Alice. You'd brute force it, and check Ktest{c1} == K{c1} until it works.
+
+Q4a: Contrast IP forwarding model with Content Centric Networking (CCN) model.
+
+CCN fulfills a similar role to IP forwarding but replaces the "where" in the packets with a "what", an interest. When the packet has a what, the lookup to move the packet around the network doesn't rely on finding an arbitrary path to an endpoint, it works by finding a path to that interest. The interest may be close or far or both, but CCN finds an efficient route to the nearest information based on several policies. This kind of lookup and packet moving comes with many security and privacy benefits and removes the need for a lot of IP infrastructure such as CDNs for websites, peer to peer/mesh networks, etc. since setting a destination is no longer required. You only need to know what you want and CCN will figure out how to request that data for you in an efficient way.
+
+Q4b: How does CCN prevent a distributed attack where an attacker requests the same content name from many different networks?
+
+CCN aggregates packets and if there are multiple consumers asking for the same data, there will only be one packet forwarded upstream. This means that even if there are many nodes requesting the same data, the server will only receive one request and will not be overloaded.
+
+The network can also listen for return packets and see if they were successfully returned or not. If not, it rate limits the number of packets it sends upstream until more of the packets come back as successful. Additionally a server that is reaching high load can ask routers sending packets to it to rate limit traffic reducing its load.
+
+Q4c: How does a CCN publisher control where its content travels?
+
+A CCN publisher is able to control where its content travels by policy-based routing. That is, they can specify which routers are able to pass along information and which ones must drop it. There are talks about how this can be achieved without even sharing a reason for why the packets must be dropped. This gives a level of secrecy.
+
+Q4d: Could CCN prevent spamming (e.g., email spamming)? Explain briefly.
+
+Yes CCN could prevent email spamming since consumers need to explicitly request that data be sent to them from certain publishers. If the consumers locked down what publishers they let talk to them, then spam could be mitigated. However, if the spam was coming from a trusted publisher (email server), then the spam could be served to consumers. I suspect that if we adopted CCN, the email providers wouldn't accept all email, and it would give them a way to reject spam publishers. It would be better than blanket banning subnets until the spammers move and are able to spam again. An explicit allow list of publishers from email vendors would block spam as it got to their servers regardless of where the email came from.
+
+
+
+
+
+
