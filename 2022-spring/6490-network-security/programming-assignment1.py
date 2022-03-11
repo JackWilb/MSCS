@@ -220,7 +220,12 @@ class Node():
 
       elif "5" in message_dict.keys():
         # Decrypt ticket to get KAB and N2
-        ticket = list(map(lambda x: decrypt(x, self.KB), message_dict["5"][0]))
+        try:
+          ticket = list(map(lambda x: decrypt(x, self.KB), message_dict["5"][0]))
+        except:
+          print("Could not decode ticket, because the decryption gives invalid string. Probably a new initialization vector in CBC.")
+          shutdown()
+          continue
 
         # Check ticket is valid by checking Nb
         if USING_NB and int.from_bytes(ticket[2], "big") != self.most_recent_nonce:
@@ -318,8 +323,22 @@ while alice.running or bob.running or kdc.running:
   continue
 
 print()
+TRUDY_REPLAY_PAYLOAD = None
+iv = make_key()
 # Start the original protocol CBC
-ENCRYPTION_MODE = modes.CBC(make_key())
+ENCRYPTION_MODE = modes.CBC(iv)
+print("Extended Needham-Schroeder CBC")
+alice.start()
+bob.start()
+kdc.start()
+
+# Wait until all parties have stopped running
+while alice.running or bob.running or kdc.running:
+  continue
+
+# Start the original protocol CBC
+iv = make_key()
+ENCRYPTION_MODE = modes.CBC(iv)
 print("Original Needham-Schroeder CBC")
 alice.start(True)
 bob.start(True)
