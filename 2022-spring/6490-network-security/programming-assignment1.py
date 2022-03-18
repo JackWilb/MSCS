@@ -280,7 +280,7 @@ class Node():
         N3_1 = int.from_bytes(decrypt(message_dict["7"], self.KAB), "big")
 
         # Add check for old N3, happens when Bob makes 2 connections (replay), we want the first n3
-        if N3_1 != self.oldN3 - 1:
+        if N3_1 != self.oldN3 - 1 and intruder:
           print("Trudy successfully tricked Bob")
 
         # Check that N3 - 1 is what we expect
