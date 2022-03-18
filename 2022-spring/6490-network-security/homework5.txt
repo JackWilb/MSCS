@@ -1,0 +1,87 @@
+Jack Wilburn
+Homework 5
+
+Q1a: 
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: No, active attacks could cause information to leak.
+identity hiding: No, there's no identity hiding
+perfect forward secrecy for identity hiding: No, there's no identity hiding
+
+Q1b: 
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: No, active attackers with the keys could trick Alice or Bob into leaking data
+identity hiding: There is some identity hiding since the communicators can only be tracked by the fact that they're sending packets. There's no leaked data that shows who is communicating.
+perfect forward secrecy for identity hiding: Same as above.
+
+Q1c: 
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: An imposter can trick the two entities into connecting through it, leading to leaked data.
+identity hiding: This will hide the identity of at least one entity, but not both without modification.
+perfect forward secrecy for identity hiding: Yes, given the statement above.
+
+Q1d:
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: No, an attacker with the shared key could leak data.
+identity hiding: No, there's no identity hiding
+perfect forward secrecy for identity hiding: No, there's no identity hiding
+
+Q1e: 
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: A bad actor can use the keys to determine the xored key. But not later, since the key is made of random nonces.
+identity hiding: Identities are hidden, aside from if someone is watching the traffic.
+perfect forward secrecy for identity hiding: Yes, given the statement above.
+
+Q1f: 
+TODO
+If Alice and Bob share a secret, they can use symmetric key crypto to authenticate. Just send a nonce encrypted with the key both ways and have the other party send back the nonce decrypted. Public key crypto is the best way to generate a symmetric key. 
+
+Q1g: 
+perfect forward secrecy: Yes
+escrow foilage against passive attacks: Yes
+escrow foilage against active attacks: Someone with keys can deterministically generate the same key
+identity hiding: This will hide the identity of at least one entity, but not both without modification.
+perfect forward secrecy for identity hiding: Yes, given the statement above.
+
+Q2a: Is it possible to use encapsulate an AH packet within an ESP packet and vice versa? Explain with the help of examples
+It seems you could put the AH in the ESP if the ESP was unencrypted. However, there's no real way to do the opposite.
+
+Q2b: Suppose Alice is sending packets to Bob using IPsec. Suppose Bob's TCP acknowledgment gets lost, and Alice's TCP, assuming the packet was lost, retransmits the packet. Will Bob's IPsec implementation notice that the packet is a duplicate and discard it?
+No, it's not IPsec's job to recognize the duplicate. It would be up to TCP to notice the duplication.
+
+Q2c: Show the relevant fields of the IP header(s) as given to A's IPsec layer, as transmitted by A, as transmitted by F1, and as received by B. 
+Transmitted by A:
+Source: A
+Dest: B
+
+Transmitted by F1 (adds another header):
+Source: F1
+Dest: F2
+
+Received by B:
+Source: A
+Dest: B
+
+Q2d: Why is IPsec not firewall-friendly? 
+IPsec is not firewall friendly, because as it traverses a NAT, the source/target IP addresses change. This breaks the protocol.
+
+Q3: In ScroogeCoin, suppose Mallory by  chance  generates  a  public,  private  key  pair  that  matches  another  person’s  public, private key pair. Could she create valid transactions stealing coins belonging to the other person? Explain briefly.
+Yes, if Mallory could generate the same key pair as someone else, she could steal their coins. The only protection on the network is to represent that a person owns the coins by the signing of transactions that leave their accounts. If Mallory could use someone elses private key, she could sign that the coins left the other persons account and ended up in her account.
+
+Q4: Submitted via handin
+
+Q5a: What are the advantages of building security at the TCP layer? 
+Building in security at the TCP layer means that there are less handshakes, decreasing the first packet latency. Additionally, you can flexibly encrypt the TCP headers and provides end to end encryption. It also functions just fine with NATs.
+
+Q5b: What flexibility does TCPsec provide for encrypting the TCP segment? 
+TCPsec allows for flexible encryption of any TCP header, including the segment. An application can choose what to encrypt.
+
+Q5c: How does TCPsec interoperate with NATs? 
+TCPsec uses a similar method to IPSec to interoperate with NATs. The client and server communicate that a NAT is between the 2 endpoints and they watch to see which ports and addresses are ultimately used. They then use that in the decryption.
+
+Q5d: Why does TCPsec handshake perform better than SSL? 
+The TCPsec handshake performs better in the handshake, because it uses a 4-way handshake instead of a 3-way TCP handshake followed by an SSL handshake.
