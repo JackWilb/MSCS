@@ -104,23 +104,34 @@ def hmacs_match(hmac1, hmac2):
   return hmac1 == hmac2
 
 def generate_key(shared_secret):
-    pwd = shared_secret
-    salt = secrets.token_bytes(16)
+  pwd = shared_secret
+  salt = secrets.token_bytes(16)
 
-    key_func = PBKDF2HMAC(
-      algorithm=hashes.SHA256(),
-      length=32,
-      salt=salt,
-      iterations=10 ** 6
-    )
+  key_func = PBKDF2HMAC(
+    algorithm=hashes.SHA256(),
+    length=32,
+    salt=salt,
+    iterations=10 ** 6
+  )
 
-    key = key_func.derive(shared_secret.to_bytes(32, "little"))
-    return key
+  key = key_func.derive(shared_secret.to_bytes(32, "little"))
+  return key
 
 def get_two_keys(shared_secret):
   k1 = generate_key(shared_secret)
   k2 = generate_key(shared_secret)
   return k1, k2
+
+def recvall(sock):
+  BUFF_SIZE = 4096 # 4 KiB
+  data = b''
+  while True:
+    part = sock.recv(BUFF_SIZE)
+    data += part
+    if len(part) < BUFF_SIZE:
+      # either 0 or end of data
+      break
+  return data
 
 
 
@@ -130,7 +141,7 @@ def threaded(fn):
   return wrapper
 
 class Node():
-  def __init__(self, name):
+  def __init__(self, name, offset=0):
     self.name = name
     self.all_messages = []
 
@@ -145,7 +156,7 @@ class Node():
       with open("programming-assignment2-B.key") as f:
         self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, f.read())
 
-      self.sock.bind(("localhost", PORT))
+      self.sock.bind(("localhost", PORT + offset))
       self.sock.listen()
     else:
       # Get cert for Alice
@@ -155,10 +166,11 @@ class Node():
       with open("programming-assignment2-A.key") as f:
         self.key = crypto.load_privatekey(crypto.FILETYPE_PEM, f.read())
 
-      self.sock.connect(("localhost", PORT))
+      self.sock.connect(("localhost", PORT + offset))
 
   @threaded
   def server_start(self):
+    self.running = True
     print("starting", self.name)
 
     while True:
@@ -233,6 +245,9 @@ class Node():
         print("server: Successfully authenticated")
       else:
         print("server: Failed to authenticated, HMAC didn't match")
+        self.sock.close()
+        self.running = False
+        return
 
 
       ##### HANDSHAKE DONE
@@ -284,19 +299,41 @@ class Node():
 
       # Send message 2
       with open(filename.decode(), 'rb') as f:
-        message = aes_encrypt(f.read(), client_encrypt_key)
+        file_data = f.read()
+        message = aes_encrypt(file_data, client_encrypt_key)
         conn.send(message)
+      
 
-      while True:
-        data = conn.recv(1024)
-        print(data)
 
-        if data == b'':
-          self.sock.close()
-          return
+      # Receive message 3
+      message = message_decode(conn.recv(4096))
+      unencrypted_message = [aes_decrypt(x, server_encrypt_key) for x in message]
+      received = unencrypted_message[0]
+      verified = Fernet(base64.b64encode(client_auth_key)).decrypt(unencrypted_message[1]) == received
+
+      if not verified or received.decode() != "received":
+        print("signature mismatch, message 3")
+
+
+      
+
+      # Send message 4
+      hash = hashlib.sha256(file_data).digest()
+      signed_hash = Fernet(base64.b64encode(server_auth_key)).encrypt(hash)
+      unencrypted_message = [hash, signed_hash]
+      message = [aes_encrypt(x, client_encrypt_key) for x in unencrypted_message]
+      conn.send(message_encode(message))
+
+
+
+      self.sock.close()
+      self.running = False
+      return
+
 
   @threaded
-  def client_start(self):
+  def client_start(self, corrupted=False):
+    self.running = True
     print("starting", self.name)
 
     ##### START HANDSHAKE
@@ -344,10 +381,19 @@ class Node():
 
 
     # Send message 5
+    if corrupted:
+      self.all_messages.append(b"added corruption")
+
     client_hmac = generate_hmac(self.all_messages, shared_secret, 'CLIENT')
     server_hmac = generate_hmac(self.all_messages, shared_secret, 'SERVER')
     message = client_hmac
     self.sock.send(message)
+
+    if corrupted:
+      self.sock.send(b"")
+      self.sock.close()
+      self.running = False
+      return
 
 
 
@@ -406,17 +452,40 @@ class Node():
 
 
     # Receive message 2
-    message = self.sock.recv(1024 * 1024 * 1024 * 8)
+    message = recvall(self.sock)
     file_data = aes_decrypt(message, client_encrypt_key)
-    
     with open("programming-assignment2-received-data.txt", "wb") as f:
       f.write(file_data) 
 
 
+    
+    # Send message 3
+    received = "received".encode()
+    signed_received = Fernet(base64.b64encode(client_auth_key)).encrypt(received)
+    unencrypted_message = [received, signed_received]
+    message = [aes_encrypt(x, server_encrypt_key) for x in unencrypted_message]
+    self.sock.send(message_encode(message))
+
+
+
+    # Receive message 4
+    message = message_decode(self.sock.recv(4096))
+    unencrypted_message = [aes_decrypt(x, client_encrypt_key) for x in message]
+    file_hash = unencrypted_message[0]
+    verified = Fernet(base64.b64encode(server_auth_key)).decrypt(unencrypted_message[1]) == file_hash
+
+    client_hash = hashlib.sha256(file_data).digest()
+    if not verified or file_hash != client_hash:
+      print("file hash mismatch, message 4")
+    else:
+      print("data is verified, file was transmitted successfully")
+
+
 
     # Send end message to server and close socket
-    self.sock.send(b"")
     self.sock.close()
+    self.running = False
+
 
 
 
@@ -429,5 +498,27 @@ class Node():
 bob = Node("Bob")
 alice = Node("Alice")
 
+print()
+print("Connect without corruption")
+print()
 bob.server_start()
 alice.client_start()
+
+# Busy wait
+while alice.running or bob.running:
+  pass
+
+del alice, bob
+
+bob = Node("Bob", 1)
+alice = Node("Alice", 1)
+
+print()
+print("Connect with corruption")
+print()
+bob.server_start()
+alice.client_start(corrupted=True)
+
+# Busy wait
+while alice.running or bob.running:
+  pass

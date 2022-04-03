@@ -69,5 +69,15 @@ Key Exchange:
 
 Data Transfer:
 
+server_encryption_key{ filename, client_auth_key{filename} }
+-------------------------------------------------->
 
+        client_encryption_key{ file_data }
+<--------------------------------------------------
+
+server_encryption_key{ "received", client_auth_key{"received"} }
+-------------------------------------------------->
+
+client_encryption_key{ sha256(file), server_auth_key{sha256(file)} }
+<--------------------------------------------------
 ```
