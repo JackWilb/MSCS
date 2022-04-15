@@ -1,0 +1,28 @@
+Jack Wilburn
+Homework 6
+
+Q1a: Importance: What are the major issues addressed in the paper? Do you consider them important? (1-2 paragraphs) 
+
+This paper has 2 sections, a literature review and a review of devices to show how they're vulnerable. The literature review takes 55 papers and categorizes them into 4 groups of focus. The 4 groups are device, mobile application, cloud services, and communication, which are the 4 spots for vulnerabilities in IoT devices.  The literature review covers 4 points for each of the 4 categories: attack vector, mitigation, stakeholders, take away. In these 4 subsections, the authors discuss what the security vulnerabilities are, how they can be mitigated, who is responsible for the mitigation, and a summary of what it all means. Ultimately, we see that the major stakeholder is the vendor, and that they are almost fully responsible for securing the devices. This indicates that vendors need to invest significant time and resources to develop a product that is secure from the factory. Users can also use this information to make their networks more secure, if they have the know how. These contributions are probably already known to vendors and technical users, but it's still valuable and important to elucidate these points. 
+
+Additionally, the authors reviewed 45 devices using a security tool that scans the devices and their outputs against known CVEs to show which vulnerability each device had. The interesting thing to me as a reader, was that every device had some kind of CVE associated with it, and that all could be exploited. This has made me much more aware of my own devices, and thus, it is a useful contribution. 
+
+A final contribution is in section 5, proposals. This section lays out what each stakeholder must do to make sure that devices are protected and well secured. This includes users securing their networks, vendors making sure devices and internal components are behaving as intended, and that we develop and follow best practices as a community. These suggestions will hopefully inspire future research and will lead to a more secure IoT landscape.
+
+Q1b: Contribution: Do the presented results constitute a significant advance  (e.g.  technical   depth,  novelty,  creative  solution, etc.)? (1-3 sentences) 
+
+This paper does constitute a significant advance, since they review multiple papers giving a full overview of the landscape of IoT devices. Additionally, the review of 45 devices shows how each device has some kind of vulnerability, and who is responsible for fixing it. The suggestion for developing better standards will inspire future research.
+
+Q1c: Strengths: What are the most important reasons to accept this paper? (1-3 sentences)
+
+This paper gives us great detail about where we are now and where we should head with regard to IoT device security. The recommendations for the future will shape our new devices, and hopefully make things more secure.
+
+Q1d: Weaknesses:  What  are  the  most  important  reasons  NOT  to accept this paper? (1-3  sentences)    
+
+This paper, while it gives a great overview of the current landscape, doesn't present many novel insights. However, it does show how many devices need to be made more robust by vendors.
+
+Q1d: Summary and comments: Please provide a brief summary, and detailed comments.  (2-3 paragraphs)  
+
+The first section covers a literature review of 55 papers from the IoT domain. The key take-aways for the devices is that they are vulnerable now and we need a systematic review of the devices to understand where they're vulnerable, and how they might be fixed. The suggestion from the authors is that the vendors are most responsible for security, but that users should have some control over the devices so they can help mitigate some of the risk. Mobile applications also need a thorough review and should act as though the device is untrusted. This would reduce the potential for a leak or other security breach. The authors also suggest that we should have guidelines for both the applications and the cloud integrations. In addition, for cloud services they recommend that there be some kind of resource that helps vendors deploy secure cloud service IoT integrations. For general communication between the device and the internet or LAN, they recommend that the vendors consult with ISPs to see how they can mitigate risks, specifically MITM attacks.
+
+The second section gives a device security review of 45 devices that the authors had. The authors ran an experiment where they set up a common network using a subnet with a router and a switch. They scanned all packets in and out, looked at the mobile application code, and ran an open source and proprietary tool to check for IoT device vulnerabilities. They found issues in default device configurations, mobile applications, cloud endpoints, and the types of communication between devices.
