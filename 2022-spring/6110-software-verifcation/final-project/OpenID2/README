@@ -1,0 +1,27 @@
+In order to build Murphi3.1 locally (recommended), execute the following:
+
+    > cd Murphi3.1/src
+    > make && make install
+    > cd ../..
+
+Though our version of Murphi will build on any leland systems,
+symmetry reduction appears not to be supported on 64-bit
+machines.  In practice, therefore, the MYTH machines are best.
+
+In the top-level project directory, type
+
+    > make
+    > ./ns -ndl -tv -m 1024
+
+to build the model-checker and run the search.  Type
+
+    > make clean
+
+before re-making, if ns.m has changed.
+
+To typeset our report paper, simply type
+
+    > make report
+
+The generated paper will be named report.pdf.  Our final slides
+are contained in the file final_slides.pdf.
