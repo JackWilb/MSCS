@@ -48,12 +48,16 @@ fact {all n: Node | n not in n.PIT.requestor}
 fact {all n: Node | n.PIT.requestor in n.neighbors}
 
 // Make sure PITMap is connected to a node
-fact {all p: PITMap | #p.~PIT != 0}
+fact {all p: PITMap | #p.~PIT = 1}
+
+// Make sure we don't have a PITMap for data that is cached locally
+fact {all n: Node | n.PIT.searchterm not in n.cache.search}
 
 
 
 
 // Make sure that all search terms are reachable from any node
-assert all_reachable {all n: Node | SearchDataMap =  n.*neighbors.cache}
+pred all_reachable {all n: Node | SearchDataMap =  n.*neighbors.cache}
 //check all_reachable for 5
 
+run all_reachable for 8
